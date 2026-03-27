@@ -250,62 +250,59 @@ async def get_sql_from_llm(question: str):
         return result
 
 async def get_summary_from_llm(question: str, data: list):
-    """Instant Python-based summary generator to avoid slow LLM sequential calls."""
-    cache_key = f"summary_{question}_{len(data)}"
+    """Refined AI Summary Engine: Provides deep insights with Government of Meghalaya persona."""
+    cache_key = f"summary_ai_{question}_{len(data)}"
     cached = summary_cache.get(cache_key)
     if cached: return cached
 
-    if not data: return "No data points found."
-    
+    if not data: return "No data points found for the requested analysis."
+
     total = len(data)
-    q_lower = question.lower()
-    
-    # 1. Detect Infrastructure Columns
-    infra_cols = [
-        'electricity_connection_available', 'drinking_water_availability', 
-        'playground_available', 'ramp_available', 'no_of_computer', 
-        'smart_classroom_available_in_school_1_yes_2_no', 'internet_facility_available_in_school_1_yes_2_no'
-    ]
-    
+    # 1. Pre-calculate Stats to guide the LLM
+    infra_cols = ['electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no']
     target_col = next((c for c in infra_cols if c in data[0]), None)
-    label = target_col.replace('_', ' ').title() if target_col else "Infrastructure"
-
-    # 2. Calculate Aggregates Instantly
-    yes = 0
-    no = 0
-    issue = 0
     
-    for d in data:
-        v = d.get(target_col)
-        if v == 1 or v == 1.0 or str(v).lower() == 'yes': yes += 1
-        elif v == 0 or v == 0.0 or str(v).lower() == 'no' or v is None: no += 1
-        elif v == 2 or v == 2.0 or 'issue' in str(v).lower(): issue += 1
-
-    # 3. Dynamic Template Injection
-    insight = f"### Analytics Summary\n\n"
-    insight += f"Analyzed **{total}** records for **{label}**.\n\n"
+    yes, no, issue = 0, 0, 0
+    if target_col:
+        for d in data:
+            v = d.get(target_col)
+            if v == 1 or v == 1.0: yes += 1
+            elif v == 0 or v == 0.0 or v is None: no += 1
+            elif v == 2 or v == 2.0: issue += 1
     
-    if yes + no + issue > 0:
-        insight += f"• **Coverage:** {yes} sites ({round(yes/total*100, 1)}%) meet the full operational requirements.\n"
-        insight += f"• **Missing Assets:** {no} sites completely lack the required infrastructure.\n"
-        insight += f"• **Repair Backlog:** {issue} sites have partial or defective equipment requiring intervention.\n"
-    else:
-        # Fallback for non-binary metrics (counts/density)
-        metric_col = next((k for k in data[0].keys() if any(m in k for m in ['total', 'density', 'count', 'per_sqkm'])), None)
-        if metric_col:
-            try:
-                max_item = max([d for d in data if d.get(metric_col) is not None], key=lambda x: float(x.get(metric_col, 0)), default={})
-                highest_name = max_item.get('schoolName') or max_item.get('block_name') or max_item.get('district_name') or 'N/A'
-                insight += f"• **Top Metric:** Found {highest_name} with the highest values for {metric_col.replace('_', ' ')}.\n"
-                insight += f"• **Regional Snapshot:** Analyzed distribution across {total} administrative units."
-            except:
-                insight += f"• **Analysis Complete:** Successfully processed {total} records for map visualization."
-        else:
-            insight += f"• **Analysis Complete:** Successfully processed {total} records for map visualization."
+    # 2. Optimized Prompt for LLM
+    stats_context = f"Total analyzed: {total}\nInfrastructure: {target_col}\n- Available/Yes: {yes}\n- Lacking/No: {no}\n- Partial/Issue: {issue}\n"
+    
+    prompt = f"""
+System: You are the Meghalaya GeoAI Assistant. Summarize the spatial data below.
+Rules:
+1. Provide exactly 3 bullet points: Key Findings, Geographic Focus, and Recommendation.
+2. Use professional, analytical language suitable for government dashboarding.
+3. Be specific about the numbers provided in the stats context.
 
-    # Cache and return instantly
-    summary_cache.set(cache_key, insight.strip())
-    return insight.strip()
+Query: {question}
+Stats:
+{stats_context}
+
+Output (3 points):
+"""
+
+    payload = {
+        "model": MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.0, "num_predict": 250}
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(OLLAMA_URL, json=payload, timeout=25.0)
+            result = response.json().get("response", "").strip()
+            summary_cache.set(cache_key, result)
+            return result
+    except Exception as e:
+        logger.error(f"AI Summary Error: {e}")
+        return f"### Analytics Summary\n\nAnalyzed {total} records. {yes} are functional, {no} are missing, and {issue} require repair."
 
 async def get_heatmap_summary(metric: str, level: str, data: list):
     """

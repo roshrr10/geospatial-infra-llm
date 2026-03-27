@@ -79,12 +79,12 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
       isBinary
     };
 
-    // New Data for Status Distribution Chart
+    // New Data for Status Distribution Chart (Show all 3 categories always)
     const statusDistData = [
-        { name: 'Available / Yes', value: positiveCount, color: '#10b981' },
-        { name: 'Functional Issue', value: issueCount, color: '#f59e0b' },
-        { name: 'Not Available / No', value: noCount, color: '#ef4444' }
-    ].filter(d => d.value > 0);
+        { name: activeMetric?.toLowerCase().includes('electricity') ? 'With Electricity' : 'Available / Yes', value: positiveCount, color: '#10b981' },
+        { name: activeMetric?.toLowerCase().includes('electricity') ? 'Connection Issue' : 'Functional Issue', value: issueCount, color: '#f59e0b' },
+        { name: activeMetric?.toLowerCase().includes('electricity') ? 'Without Electricity' : 'Not Available / No', value: noCount, color: '#ef4444' }
+    ];
 
     // Prepare Regional Breakdown (Separate Districts and Blocks)
     const { districtBreakdown, blockBreakdown } = (() => {
@@ -217,12 +217,12 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
       <div className="max-w-6xl mx-auto space-y-8">
         
         {summary && (
-            <div className="bg-white p-6 rounded-[32px] border-2 border-blue-50 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><Lightbulb size={64} className="text-blue-600" /></div>
-                <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2 italic">
-                    <Lightbulb size={14} /> AI Analysis Snapshot
+            <div className="bg-white p-8 rounded-[40px] border-2 border-blue-100 shadow-xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity"><Sparkles size={120} className="text-blue-600" /></div>
+                <h3 className="text-xs font-black text-blue-600 uppercase tracking-[0.3em] mb-4 flex items-center gap-3 italic">
+                    <Sparkles size={16} className="animate-pulse" /> GeoAI Analytical Report
                 </h3>
-                <div className="text-slate-600 text-sm leading-relaxed font-medium">
+                <div className="text-slate-700 text-base leading-relaxed font-semibold whitespace-pre-line border-l-4 border-blue-500 pl-6 py-2 bg-blue-50/30 rounded-r-2xl">
                     {summary}
                 </div>
             </div>
