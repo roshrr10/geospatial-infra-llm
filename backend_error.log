@@ -6354,3 +6354,27 @@ SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, s.geomet
 FROM meghalaya_schools s
 JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
 WHERE library_facility = 1 AND s.block_name ILIKE '%RI BHOI%';
+
+
+FINAL ERROR AFTER 2 RETRIES:
+sqlalchemy.cyextension.immutabledict.immutabledict is not a sequence
+
+TRACE:
+NoneType: None
+
+SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, s.geometry
+FROM meghalaya_schools s
+JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
+WHERE i.library_facility = 1 AND s.block_name ILIKE '%RI BHOI%';
+
+
+FINAL ERROR AFTER 2 RETRIES:
+sqlalchemy.cyextension.immutabledict.immutabledict is not a sequence
+
+TRACE:
+NoneType: None
+
+SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, s.geometry
+FROM meghalaya_schools s
+JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
+WHERE i.library_facility = 1 AND s.block_name ILIKE '%RI BHOI%';

@@ -110,13 +110,26 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
     
-    # Blocks in a specific district (e.g., RI BHOI)
-    if 'block' in q_lower and any(kw in q_lower for kw in ['district', 'in ', 'for ']):
+    # DISTRICT-LEVEL FILTERS (e.g., "schools in RI BHOI", "blocks in RI BHOI")
+    if any(d.lower() in q_lower for d in ["east khasi hills", "west khasi hills", "south west khasi hills", "ri bhoi", "east jaintia hills", "west jaintia hills", "east garo hills", "west garo hills", "south garo hills", "south west garo hills", "north garo hills"]):
         dists = ["EAST KHASI HILLS", "WEST KHASI HILLS", "SOUTH WEST KHASI HILLS", "RI BHOI", "EAST JAINTIA HILLS", "WEST JAINTIA HILLS", "EAST GARO HILLS", "WEST GARO HILLS", "SOUTH GARO HILLS", "SOUTH WEST GARO HILLS", "NORTH GARO HILLS"]
         target_dist = next((d for d in dists if d.lower() in q_lower), "")
+        
         if target_dist:
-            sql = f"SELECT block_name, district_name, total_schools, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final WHERE district_name = '{target_dist}' ORDER BY total_schools DESC;"
-            result = (sql, "block")
+            if 'block' in q_lower:
+                sql = f"SELECT block_name, district_name, total_schools, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final WHERE district_name = '{target_dist}' ORDER BY total_schools DESC;"
+                result = (sql, "block")
+            else:
+                # Default: Show all schools in this district with potential infra Join
+                # Check if specific infra column is mentioned
+                infra_col = next((c for c in ['electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no', 'library_facility'] if c.split('_')[0] in q_lower), 'electricity_connection_available')
+                sql = f"""-- NO_STRIP
+                        SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.{infra_col}, s.geometry 
+                        FROM meghalaya_schools s 
+                        JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text 
+                        WHERE s.district_name = '{target_dist}' ORDER BY s."schoolName" ASC;"""
+                result = (sql, "school")
+            
             llm_cache.set(question, result)
             return result
 
@@ -292,8 +305,12 @@ async def get_summary_from_llm(question: str, data: list):
 
     total = len(data)
     # 1. Pre-calculate Stats to guide the LLM
-    infra_cols = ['electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no']
-    target_col = next((c for c in infra_cols if c in data[0]), None)
+    infra_cols = ['ramp_available', 'electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no']
+    # Prioritize detecting the column that is actually in the question
+    q_low = question.lower()
+    target_col = next((c for c in infra_cols if c in data[0] and c.split('_')[0] in q_low), None)
+    if not target_col:
+        target_col = next((c for c in infra_cols if c in data[0]), None)
     
     yes, no, issue = 0, 0, 0
     if target_col:

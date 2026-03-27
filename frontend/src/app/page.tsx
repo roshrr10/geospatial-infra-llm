@@ -671,7 +671,6 @@ export default function Dashboard() {
             <>
               <LayerControl activeMetric={activeMetric} onMetricChange={setActiveMetric} viewMode={viewMode} onModeChange={setViewMode} adminLevel={mapLevel as any} onLevelChange={setMapLevel} dynamicOptions={dynamicMetrics} />
               <GeoMap 
-                key={`${mapLevel}_${apiResult?.geojson?.features?.length || 0}_${lastSearch}`}
                 geojson={apiResult?.geojson} 
                 basemap={basemapData} 
                 currentLevel={mapLevel} 
