@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
+import { BarChart2, Filter, Layers, Map as MapIcon, Compass, Sparkles } from "lucide-react";
 
 // Fix for default marker icons in Leaflet + Next.js
 const fixIcon = () => {
@@ -40,8 +41,12 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     const [legendConfig, setLegendConfig] = useState<any>(null);
 
     const normalizeName = (name: any) => {
-        if (!name) return "";
-        return String(name).toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
+        if (!name) return '';
+        return name.toString()
+            .toLowerCase()
+            .replace(/\b(district|block|subdivision|hq|sub|the|development|state|union)\b/g, '')
+            .replace(/[^a-z0-9]/g, '')
+            .trim();
     };
 
     // --- DATA & INFRASTRUCTURE DETECTION ---
@@ -368,6 +373,21 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     ))}
                 </div>
             )}
+            {/* Choropleth Legend */}
+            {gradientMetric && (
+                <div className="absolute bottom-24 right-8 z-[1000] glass p-4 rounded-2xl shadow-2xl border border-white/20 min-w-[180px]">
+                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center justify-between">
+                        <span>{gradientMetric.replace(/_/g, ' ').toUpperCase()}</span>
+                        <BarChart2 size={12} className="text-blue-500" />
+                    </div>
+                    <div className="h-4 w-full rounded-full bg-gradient-to-r from-blue-50 to-blue-900 border border-blue-100 shadow-inner mb-2" />
+                    <div className="flex justify-between text-[11px] font-bold text-slate-700">
+                        <span>{metricMin.toLocaleString()}</span>
+                        <span>{metricMax.toLocaleString()}</span>
+                    </div>
+                </div>
+            )}
+
             {legendConfig && (
                 <div className="absolute bottom-6 left-6 z-[1000] p-4 rounded-xl min-w-[200px] bg-white/95 backdrop-blur-md border border-white/20 shadow-2xl animate-in fade-in slide-in-from-bottom-2">
                     <div className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-1 border-b border-slate-200 pb-1">{legendConfig.metricLabel}</div>
