@@ -27,7 +27,7 @@ interface GeoMapProps {
     activeMetric?: string;
     searchQuery?: string;
     initialFilterIntent?: 'all' | 'yes' | 'no' | 'issue';
-    viewMode: "polygon" | "heatmap";
+    viewMode: "map" | "dashboard" | "heatmap";
     apiResult?: any;
 }
 
@@ -39,6 +39,20 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 
     const [filterMode, setFilterMode] = useState<'all' | 'yes' | 'no' | 'issue'>('all');
     const [legendConfig, setLegendConfig] = useState<any>(null);
+    
+    // Refs for analytical context (solves stale closures in Leaflet events)
+    const apiResultRef = useRef(apiResult);
+    const gMetricRef = useRef<string | null>(null);
+    const mMinRef = useRef(0);
+    const mMaxRef = useRef(100);
+    const activeMetricRef = useRef(activeMetric);
+    const viewModeRef = useRef(viewMode);
+    
+    useEffect(() => { 
+        apiResultRef.current = apiResult; 
+        activeMetricRef.current = activeMetric;
+        viewModeRef.current = viewMode;
+    }, [apiResult, activeMetric, viewMode]);
 
     const normalizeName = (name: any) => {
         if (!name) return '';
@@ -156,35 +170,44 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 
         const map = mapRef.current;
 
+        // --- REFS SYNC FOR STYLE FACTORY ---
+        gMetricRef.current = gradientMetric;
+        mMinRef.current = metricMin;
+        mMaxRef.current = metricMax;
+
         const getChoroplethStyle = (feature: any) => {
-            // 1. Hide polygons completely in Heatmap Mode
+            // 1. Isolation: Hide EVERYTHING in Heatmap Mode
             if (viewMode === 'heatmap') {
-                return { fillOpacity: 0, weight: 0, color: 'transparent', interactive: false };
+                return { fillOpacity: 0, weight: 0, opacity: 0, color: 'transparent', interactive: false };
             }
 
-            const defaultStyle = { color: "#64748b", weight: 1, fillOpacity: 0.15, fillColor: "#e2e8f0", interactive: true };
-            const rawPropName = feature.properties?.block_name || feature.properties?.district_name || feature.properties?.NAME || feature.properties?.name;
-            const nName = normalizeName(rawPropName);
+            const defaultStyle = { color: "#64748b", weight: 1.5, fillOpacity: 0.15, fillColor: "#e2e8f0", interactive: true };
+            const nName = normalizeName(feature.properties?.block_name || feature.properties?.district_name || feature.properties?.NAME || feature.properties?.name);
 
-            if (apiResult?.table && nName) {
-                // AGGRESSIVE SEARCH: Look through ALL column values in every record to find the admin name
-                const record = apiResult.table.find((r: any) => {
+            const currentTable = apiResultRef.current?.table;
+            const currentGMetric = gMetricRef.current;
+            const currentMin = mMinRef.current;
+            const currentMax = mMaxRef.current;
+
+            if (currentTable && nName) {
+                // Find matching record aggressively
+                const record = currentTable.find((r: any) => {
                     return Object.values(r).some(val => {
-                        const sVal = String(val);
-                        return normalizeName(sVal) === nName || sVal.toLowerCase().includes(nName) || nName.includes(sVal.toLowerCase());
+                        const sVal = normalizeName(String(val));
+                        return sVal === nName || sVal.includes(nName) || nName.includes(sVal);
                     });
                 });
 
-                if (record && gradientMetric) {
-                    const val = parseFloat(record[gradientMetric]);
+                if (record && currentGMetric) {
+                    const val = parseFloat(record[currentGMetric]);
                     if (!isNaN(val)) {
-                        const range = metricMax - metricMin;
-                        const ratio = range > 0 ? Math.min(1, Math.max(0, (val - metricMin) / range)) : (val > 0 ? 1 : 0);
+                        const range = currentMax - currentMin;
+                        const ratio = range > 0 ? Math.min(1, Math.max(0, (val - currentMin) / range)) : (val > 0 ? 1 : 0);
                         
-                        // Vibrant Royal Blue Gradient
-                        const r = Math.round(200 - ratio * 180); // 200 -> 20
-                        const g = Math.round(210 - ratio * 160); // 210 -> 50
-                        const b = Math.round(255 - ratio * 135); // 255 -> 120
+                        // Ultra-Vibrant High Contrast Palette
+                        const r = Math.round(180 - ratio * 160); // 180 -> 20
+                        const g = Math.round(200 - ratio * 150); // 200 -> 50
+                        const b = Math.round(255 - ratio * 100); // 255 -> 155
                         return { color: "white", weight: 2, fillOpacity: 0.95, fillColor: `rgb(${r},${g},${b})`, interactive: true };
                     }
                 }
@@ -222,32 +245,25 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                             L.DomEvent.stopPropagation(e);
                             if (onFeatureClick) onFeatureClick(currentLevel, name);
                         },
-                        mouseout: (e) => {
-                            if (basemapLayerRef.current) {
-                                basemapLayerRef.current.setStyle((f: any) => getChoroplethStyle(f));
-                            }
+                    mouseout: (e) => {
+                        if (basemapLayerRef.current) {
+                            basemapLayerRef.current.setStyle(getChoroplethStyle);
                         }
-                    });
-                }
-            }).addTo(map);
-
-            // Force immediate style application
-            basemapLayerRef.current.setStyle(getChoroplethStyle);
-
-            if (!geojson) {
-                const bounds = basemapLayerRef.current.getBounds();
-                if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
+                    }
+                });
             }
-        }
-        
-        map.invalidateSize();
+        }).addTo(map);
 
-        if (geojson || apiResult?.table) {
-            if (geojsonLayerRef.current) map.removeLayer(geojsonLayerRef.current);
-            
-            if (geojson) {
-                geojsonLayerRef.current = L.geoJSON(geojson, {
-                    pane: 'schools',
+        // 3. GEOJSON LAYER (Dots)
+        if (geojsonLayerRef.current) {
+            map.removeLayer(geojsonLayerRef.current);
+            geojsonLayerRef.current = null;
+        }
+
+        const isHeatmap = viewMode === 'heatmap';
+        if (geojson && !isHeatmap) {
+            geojsonLayerRef.current = L.geoJSON(geojson, {
+                pane: 'schools',
                     filter: (feature) => {
                         if (filterMode === 'all') return true;
                         const props = feature.properties || {};
