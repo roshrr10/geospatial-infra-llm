@@ -158,6 +158,34 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
+    # --- DENSITY & AGGREGATE FALLBACKS ---
+    if 'road density' in q_lower and 'district' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT district_name, road_density_km_per_sqkm as road_density 
+                 FROM meghalaya_district_intelligence_final 
+                 ORDER BY road_density DESC;"""
+        result = (sql, "district")
+        llm_cache.set(question, result)
+        return result
+
+    if 'school density' in q_lower and 'block' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT block_name, district_name, schools_per_sqkm as school_density 
+                 FROM meghalaya_block_intelligence_final 
+                 ORDER BY school_density DESC;"""
+        result = (sql, "block")
+        llm_cache.set(question, result)
+        return result
+
+    if 'total schools' in q_lower and 'district' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT district_name, total_schools 
+                 FROM meghalaya_district_intelligence_final 
+                 ORDER BY total_schools DESC;"""
+        result = (sql, "district")
+        llm_cache.set(question, result)
+        return result
+
     # NO ELECTRICITY (Direct Sidebar Fix)
     if 'no electricity' in q_lower or 'lack electricity' in q_lower:
         sql = """-- NO_STRIP

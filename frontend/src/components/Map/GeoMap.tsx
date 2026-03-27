@@ -143,14 +143,15 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         const map = mapRef.current;
 
         const getChoroplethStyle = (feature: any) => {
-            if (geojson) return { color: "#475569", weight: 1, fillOpacity: 0.1, fillColor: "#cbd5e1" };
+            // DO NOT return grey just because geojson (dots) exists. 
+            // We want to see the density color ON the basemap polygons even with dots on top.
             const defaultStyle = { color: "#475569", weight: 1.5, fillOpacity: 0.2, fillColor: "#cbd5e1", interactive: true };
             const nName = normalizeName(feature.properties?.block_name || feature.properties?.district_name);
 
             if (apiResult?.table) {
                 const record = apiResult.table.find((r: any) => {
-                    const rn = normalizeName(r.block_name || r.district_name || r.BLOCK || r.DISTRICT);
-                    return rn === nName;
+                    const rName = r.block_name || r.district_name || r.block || r.district || r.BLOCK || r.DISTRICT || r.name || r.display_name;
+                    return normalizeName(rName) === nName;
                 });
 
                 if (record && gradientMetric) {
@@ -158,9 +159,11 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     if (!isNaN(val)) {
                         const range = metricMax - metricMin;
                         const ratio = range > 0 ? Math.min(1, Math.max(0, (val - metricMin) / range)) : (val > 0 ? 1 : 0);
-                        const r = Math.round(240 - ratio * 225);
-                        const g = Math.round(249 - ratio * 226);
-                        const b = Math.round(255 - ratio * 175);
+
+                        // High-contrast Vibrant Blue Palette for better visibility
+                        const r = Math.round(230 - ratio * 210); // 230 -> 20
+                        const g = Math.round(242 - ratio * 200); // 242 -> 42
+                        const b = Math.round(255 - ratio * 155); // 255 -> 100
                         return { color: "white", weight: 1.5, fillOpacity: 0.85, fillColor: `rgb(${r},${g},${b})` };
                     }
                 }
