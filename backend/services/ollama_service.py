@@ -133,7 +133,6 @@ async def get_sql_from_llm(question: str):
             llm_cache.set(question, result)
             return result
 
-    # ---- MULTI-INFRASTRUCTURE FALLBACKS ----
     # Computers AND smart classrooms
     if ('computer' in q_lower and 'smart' in q_lower) or ('computer' in q_lower and 'classroom' in q_lower):
         sql = """-- NO_STRIP
@@ -141,7 +140,7 @@ async def get_sql_from_llm(question: str):
                  i.no_of_computer, i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
                  s.geometry
                  FROM meghalaya_schools s
-                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11);"""
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
@@ -277,7 +276,7 @@ async def get_sql_from_llm(question: str):
                 retry_idx = sql.upper().find("SELECT")
                 if retry_idx > -1:
                     sql = sql[retry_idx:]
-
+            
             if ';' not in sql: sql += ';'
             
             level = "school"
@@ -314,40 +313,51 @@ async def get_summary_from_llm(question: str, data: list):
 
     if not data: return "No data points found for the requested analysis."
 
-    total = len(data)
+    total_analyzed = len(data)
     # 1. Pre-calculate Stats to guide the LLM
-    infra_cols = ['ramp_available', 'electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no', 'library_facility']
-    # Prioritize detecting the column that is actually in the question
+    infra_cols = ['ramp_available', 'electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no', 'library_facility', 'internet_facility_available_in_school_1_yes_2_no']
     q_low = question.lower()
     
-    # Precise match: check if the first word of the col (e.g. 'ramp') is in the question
-    target_col = next((c for c in infra_cols if c in data[0] and c.split('_')[0] in q_low), None)
+    # Identify ALL target columns mentioned in the question and present in data
+    target_cols = [c for c in infra_cols if c in data[0] and (c.split('_')[0] in q_low or (c=='smart_classroom_available_in_school_1_yes_2_no' and 'smart' in q_low))]
     
-    # Fallback to any valid column found in both data and infra_cols
-    if not target_col:
-        target_col = next((c for c in infra_cols if c in data[0]), None)
+    # Fallback if none detected by keyword
+    if not target_cols:
+        target_cols = [next((c for c in infra_cols if c in data[0]), 'electricity_connection_available')]
+
+    # Calculate Joint Stats
+    joint_met = 0
+    individual_stats = {c: 0 for c in target_cols}
     
-    yes, no, issue = 0, 0, 0
-    if target_col:
-        for d in data:
-            v = d.get(target_col)
-            if v == 1 or v == 1.0: yes += 1
-            elif v == 0 or v == 0.0 or v is None: no += 1
-            elif v == 2 or v == 2.0: issue += 1
-    
-    # 2. Optimized Prompt for LLM
-    stats_context = f"Total analyzed: {total}\nInfrastructure: {target_col}\n- Available/Yes: {yes}\n- Lacking/No: {no}\n- Partial/Issue: {issue}\n"
+    def is_pos(val, col_name):
+        if col_name == 'no_of_computer': return (int(val) if val is not None else 0) > 0
+        return (int(val) if val is not None else 0) == 1
+
+    for d in data:
+        all_met = True
+        for col in target_cols:
+            met = is_pos(d.get(col), col)
+            if met: individual_stats[col] += 1
+            else: all_met = False
+        if all_met: joint_met += 1
+
+    # 2. Optimized Prompt with Multi-Metric Context
+    stats_context = f"Total Records: {total_analyzed}\nCriteria Analyzed: {', '.join(target_cols)}\n"
+    stats_context += f"- Jointly Met (All Criteria): {joint_met} ({round(joint_met/total_analyzed*100, 1) if total_analyzed > 0 else 0}%)\n"
+    for col, count in individual_stats.items():
+        stats_context += f"- {col}: {count} Met\n"
     
     prompt = f"""
-System: You are the Meghalaya GeoAI Assistant. Summarize the spatial data below.
-Rules:
-1. Provide exactly 3 bullet points: Key Findings, Geographic Focus, and Recommendation.
-2. Use professional, analytical language suitable for government dashboarding.
-3. Be specific about the numbers provided in the stats context.
-
-Query: {question}
-Stats:
+System: You are the Meghalaya GeoAI Assistant. Summarize the spatial data findings below.
+Persona: Analytical, professional Government Consultant.
+Context: Analyzed {total_analyzed} schools for {', '.join(target_cols)}.
+Findings:
 {stats_context}
+
+Rules:
+1. Return exactly 3 bullet points (Findings, Hotspots, Recommendations).
+2. Use specific percentages from the context.
+3. Keep it professional and focused on the joint condition if multiple were requested.
 
 Output (3 points):
 """
@@ -367,7 +377,7 @@ Output (3 points):
             return result
     except Exception as e:
         logger.error(f"AI Summary Error: {e}")
-        return f"### Analytics Summary\n\nAnalyzed {total} records. {yes} are functional, {no} are missing, and {issue} require repair."
+        return f"### Analytics Summary\n\nAnalyzed {total_analyzed} records. Jointly met: {joint_met}."
 
 async def get_heatmap_summary(metric: str, level: str, data: list):
     """

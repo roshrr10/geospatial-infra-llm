@@ -260,49 +260,54 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             geojsonLayerRef.current = null;
         }
 
-        const isHeatmap = viewMode === 'heatmap';
-        if (geojson && !isHeatmap) {
+        const isHeatmapMode = String(viewMode) === 'heatmap';
+        if (geojson && !isHeatmapMode) {
             geojsonLayerRef.current = L.geoJSON(geojson, {
                 pane: 'schools',
                     filter: (feature) => {
                         if (filterMode === 'all') return true;
                         const props = feature.properties || {};
-                        const isPos = (v: any) => {
+                        const isPos = (v: any, key?: string) => {
                             const val = Number(v);
+                            if (key?.toLowerCase().includes('computer')) return val > 0;
                             return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
                         };
-                        const isNeg = (v: any) => {
+                        const isNeg = (v: any, key?: string) => {
                             const val = Number(v);
+                            if (key?.toLowerCase().includes('computer')) return val === 0 || v === null;
                             return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
                         };
-                        const isIssue = (v: any) => {
+                        const isIssue = (v: any, key?: string) => {
                             const val = Number(v);
+                            if (key?.toLowerCase().includes('computer')) return false; // No partial computers defined
                             return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
                         };
 
                         if (queryMode === 'multi_binary') {
-                            const score = relevantInfraCols.filter(k => isPos(props[k])).length;
-                            const issues = relevantInfraCols.filter(k => isIssue(props[k])).length;
+                            const score = relevantInfraCols.filter(k => isPos(props[k], k)).length;
+                            const issues = relevantInfraCols.filter(k => isIssue(props[k], k)).length;
                             if (filterMode === 'yes') return score === relevantInfraCols.length;
                             if (filterMode === 'no') return score === 0 && issues === 0;
                             if (filterMode === 'issue') return issues > 0 || (score > 0 && score < relevantInfraCols.length);
                         } else {
                             const col = activeMetric || relevantInfraCols[0];
                             if (!col) return true;
-                            if (filterMode === 'yes') return isPos(props[col]);
-                            if (filterMode === 'no') return isNeg(props[col]);
-                            if (filterMode === 'issue') return isIssue(props[col]);
+                            if (filterMode === 'yes') return isPos(props[col], col);
+                            if (filterMode === 'no') return isNeg(props[col], col);
+                            if (filterMode === 'issue') return isIssue(props[col], col);
                         }
                         return true;
                     },
                     style: (feature) => {
                         const props = feature?.properties || {};
-                        const isPos = (v: any) => {
+                        const isPos = (v: any, key?: string) => {
                             const val = Number(v);
+                            if (key?.toLowerCase().includes('computer')) return val > 0;
                             return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
                         };
-                        const isIssue = (v: any) => {
+                        const isIssue = (v: any, key?: string) => {
                             const val = Number(v);
+                            if (key?.toLowerCase().includes('computer')) return false;
                             return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
                         };
                         
@@ -320,22 +325,22 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         }
 
                         if (queryMode === 'multi_binary') {
-                            const score = relevantInfraCols.filter(k => isPos(props[k])).length;
-                            const issues = relevantInfraCols.filter(k => isIssue(props[k])).length;
+                            const score = relevantInfraCols.filter(k => isPos(props[k], k)).length;
+                            const issues = relevantInfraCols.filter(k => isIssue(props[k], k)).length;
                             let fillColor = "#ef4444";
                             if (score === relevantInfraCols.length) fillColor = "#10b981";
                             else if (issues > 0 || score > 0) fillColor = "#f59e0b";
-                            return { color: '#10172a', weight: 1.5, opacity: 1, fillColor, fillOpacity: 0.9 };
+                            return { color: '#000', weight: 1.5, opacity: 1, fillColor, fillOpacity: 1, radius: 8 };
                         } else {
                             const col = activeMetric || relevantInfraCols[0];
                             let fillColor = "#3b82f6";
                             if (col && props[col] !== undefined) {
                                 const val = props[col];
-                                if (isPos(val)) fillColor = "#10b981";
-                                else if (isIssue(val)) fillColor = "#f59e0b";
+                                if (isPos(val, col)) fillColor = "#10b981";
+                                else if (isIssue(val, col)) fillColor = "#f59e0b";
                                 else fillColor = "#ef4444";
                             }
-                            return { color: '#10172a', weight: 1.5, opacity: 1, fillColor, fillOpacity: 0.9 };
+                            return { color: '#000', weight: 1.5, opacity: 1, fillColor, fillOpacity: 1, radius: 8 };
                         }
                     },
                     pointToLayer: (feature, latlng) => {
