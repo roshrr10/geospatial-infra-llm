@@ -1,0 +1,117 @@
+clean_name,original_name
+id,Sl. No
+udisecode,UdiseCode
+schname,SchName
+school_management,School Management
+school_category,School Category 
+district_name,District Name
+block_name,Block Name
+cluster_name,Cluster Name
+village_name,Village Name
+schlocation,SchLocation
+schtype,Schtype
+building_status_1_private_owned_2_rented_3_governm,"Building Status (1-Private Owned, 2-Rented, 3-Government Owned, 4-Government School in a Rent free building, 5-NO
+Building (Running in Open Place), 6-School Running in other Department Building)"
+total_number_of_building_blocks_of_the_school,Total Number of Building Blocks of the School
+type_of_boundary_wall_1_pucca_2_pucca_but_broken_3,"Type of Boundary Wall (1-Pucca, 2-Pucca but broken, 3-Barbed wire fencing, 4-Hedges, 5-No boundary walls, 6-Others, 7-Partial,
+8-Under Construction)"
+dilapidated_building,Dilapidated Building
+total_classrooms_in_dilapidated_condition,Total Classrooms in Dilapidated Condition
+halls_avaible,Halls Avaible
+medical_facilities_available,Medical Facilities (Medical Rooms) Available
+store_room_available,Store Room Available
+minority_managed_school,"Minority managed school (1-Yes, 2-No)"
+boundary_wall_type,"Boundary wall type (1-Pucca, 2-Pucca but broken, 3- Barbed wire fencing, 4-Hedges, 5-No boundary walls, 6-Others, 7-Partial, 8-Under Construction)"
+fire_extinguisher_available,"Fire extinguisher available (1-Yes, 2-No)"
+whether_receiving_free_uniform,"Whether receiving free uniform (1-Yes, 2-No)"
+whether_receiving_free_textbook_for_primary,"Whether receiving free Textbook for primary (1-Yes, 2-No)"
+whether_receiving_free_textbook_for_upper_primary,"Whether receiving free Textbook for upper Primary (1-Yes, 2-No)"
+girls_activity_room_available,Girls Activity Room Available 
+eletricity_connection_available,Eletricity connection Available
+ramp_available,Ramp Available
+if_yes_specify_ramp_with_handrail_or_without_handr,"If yes, specify Ramp with Handrail or without Handrail"
+sport_equiptment,Sport Equiptment
+separate_room_for_head_teacher_principal_available,Separate Room for Head Teacher/Principal Available
+staffroom_for_teacher,Staffroom For Teacher
+staff_quarters,Staff Quarters (Including Residential Quarters for Head Teacher/Principal and Asst. Head Teacher/Vice Principal)
+total_no_of_class_rooms_use_for_instructional_purp,Total no of Class Rooms use for Instructional Purpose 
+no_of_classroom_under_construction,No. of classroom under construction
+no_of_pucca_classroom_for_in_good_condition,No. of Pucca classroom for in good condition
+no_of_pucca_classroom_in_for_major_repair,No. of Pucca classroom in  for major repair
+no_of_pucca_classroom_in_for_minor_repair,No. of Pucca classroom in  for minor repair
+no_of_partially_pucca_classroom_for_in_good_condit,No. of Partially Pucca classroom for  in good condition
+no_of_partially_pucca_classroom_for_for_minor_repa,No. of Partially Pucca classroom for  for minor repair
+no_of_partially_pucca_classroom_for_for_major_repa,No. of Partially Pucca classroom for  for major repair
+no_of_kuccha_classroom_for_in_good_condition,No. of Kuccha classroom for  in good condition
+no_of_kuccha_classroom_for_for_minor_repairing,No. of Kuccha classroom for  for minor repairing
+no_of_kuccha_classroom_for_for_major_repairing,No. of Kuccha classroom for  for major repairing
+tent,Tent
+land_is_available_for_expansion_of_school_faciliti,Land is Available for Expansion of School Facilities
+boy_toilet_available,Boy toilet available
+no_of_toilet_for_boys,No of toilet for Boys
+no_of_functional_toilet_for_boys,No of  Functional toilet for Boys
+no_of_cwsn_for_boys,No of CWSN(Toilet)  for Boys
+no_of_functional_cwsn_for_boys,No of Functional CWSN (Toilet) for Boys
+girls_toilet_available,Girls toilet available
+no_of_toilet_for_girls,No of toilet for Girls
+no_of_functional_toilet_for_girls,No of Functional toilet for Girls
+no_of_cwsn_for_girls,No of CWSN(Toilet)  for Girls
+no_of_functional_cwsn_for_girls,No of Functional CWSN (Toilet) for Girls
+handwash_facility,Handwash facility
+hand_washing_facility_near_toilet,Hand washing Facility near Toilet
+hand_washing_facility_after_meals,Hand washing Facility after Meals
+drinking_water_availability,Drinking Water Availability
+drinking_water_functional,Drinking Water Functional
+are_there_any_rainwater_harvesting_structures_impl,Are there any rainwater harvesting structures implemented within the school campus? 
+has_the_school_availed_facilities_provided_under_t,Has the school availed facilities provided under the Jal Jeevan Mission (JJM)?
+solar_panel,Solar Panel 
+is_your_school_equipped_with_solar_panel_for_energ,Is your school equipped with Solar Panel for energy generation?
+if_yes_specify_whether_they_are_functional_or_not_,"         If Yes, specify whether they are  functional or not functional"
+whether_your_school_having_sanitary_pad_vending_ma,"Whether your school having Sanitary Pad vending Machine - For schools having Secondary and Higher Secondary Sections (1- Yes, 2- No, 3- Yes, but not functional, 4- NO, Pads available with Class Teachers, 9 Not Applicable)"
+whether_your_school_having_functional_incinerator_,Whether your school  having functional incinerator in girls toilets - For schools having Secondary and Higher Secondary Sections
+library_facility,Library Facility
+does_the_school_have_a_designated_library_room,Does the school have a designated Library room?
+does_the_school_have_book_bank_facility,Does the School have book bank facility
+if_yes_no_of_books_are_available,"If yes, No of books are available"
+no_of_librarians,No of Librarians
+no_of_computers_available_in_the_library_room,No of Computers Available in the Library Room
+reading_corner_available,Reading Corner Available
+power_backup_available,Power Backup Available 
+furniture_available,Furniture Available
+playground_available,Playground Available
+separate_common_room_for_girls,Separate Common Room For Girls 
+co_curricular_activity_room_arts_and_crafts_room,Co-Curricular Activity Room/Arts And Crafts Room 
+integrated_science_laboratory_for_secondary_detail,Integrated Science Laboratory for Secondary Details 
+no_of_room_available,No of Room Available
+maths_lab_for_secondary_details,Maths Lab for Secondary Details 
+no_of_room_available_1,No of Room Available 
+physics_laboratory_for_higher_secondary,Physics Laboratory for Higher Secondary 
+no_of_room_available_1_1,No of Room Available .1
+chemistry_laboratory_for_higher_secondary,Chemistry Laboratory for Higher Secondary 
+no_of_room_available_2,No of Room Available .2
+biology_laboratory_for_higher_secondary,Biology Laboratory  for Higher Secondary
+no_of_room_available_3,No of Room Available .3
+library_room,Library Room
+no_of_books_avaialble,No of Books avaialble
+computer_room,Computer Room 
+no_of_computer,No of computer 
+tinkering_lab,Tinkering Lab
+internet_facility_available_in_school,"Internet Facility available in school (1-Yes, 2-No)"
+smart_classroom_available_in_school,"Smart classroom available in school (1-Yes, 2-No)"
+no_of_smart_classroom,No of Smart classroom
+ict_lab_available,ICT Lab Available
+ictlab_functional,ICTLab Functional
+total_number_of_desktops_laptops, Total Number of Desktops/Laptops 
+total_number_of_functional_desktops,Total Number of functional desktops
+total_number_of_functional_laptops,Total Number of functional Laptops
+total_number_of_functional_tablets,Total Number of functional Tablets
+total_number_of_functional_digital_boards,Total Number of functional digital boards
+total_number_of_functional_projectors,Total Number of functional projectors
+hostel_facilities_for_boys,Hostel Facilities for Boys
+does_the_school_have_hostel_facilities_for_boys,Does the school have hostel facilities for Boys?
+intake_capacity,Intake capacity
+no_of_students_are_currently_residing_in_the_hoste,No of students are currently residing in the hostel
+hostel_facilities_for_girls,Hostel Facilities for Girls
+does_the_school_have_hostel_facilities_for_girls,Does the school have hostel facilities for Girls?
+intake_capacity_1,Intake capacity.1
+no_of_students_are_currently_residing_in_the_hoste_1,No of students are currently residing in the hostel.1

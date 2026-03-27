@@ -1,0 +1,12 @@
+block_name
+district_name
+block_area_sqkm
+total_road_km
+road_density_km_per_sqkm
+total_schools
+schools_per_sqkm
+geometry
+avg_ifa_coverage_girls
+avg_ifa_coverage_boys
+avg_deworm_coverage_girls
+avg_deworm_coverage_boys
