@@ -207,9 +207,9 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     filter: (feature) => {
                         if (filterMode === 'all') return true;
                         const props = feature.properties || {};
-                        const isPos = (v: any) => v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0);
-                        const isNeg = (v: any) => v === 0 || v === 0.0 || ['no', 'false', 'none', 'missing'].includes(String(v).toLowerCase().trim());
-                        const isIssue = (v: any) => v === 2 || v === 2.0 || String(v).toLowerCase().includes('issue');
+                        const isPos = (v: any) => (v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0)) && v !== 2 && v !== 2.0;
+                        const isNeg = (v: any) => v === 0 || v === 0.0 || v === null || v === undefined || ['no', 'false', 'none', 'missing'].includes(String(v).toLowerCase().trim());
+                        const isIssue = (v: any) => v === 2 || v === 2.0 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
 
                         if (queryMode === 'multi_binary') {
                             const score = relevantInfraCols.filter(k => isPos(props[k])).length;
@@ -228,8 +228,8 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     },
                     style: (feature) => {
                         const props = feature?.properties || {};
-                        const isPos = (v: any) => v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0);
-                        const isIssue = (v: any) => v === 2 || v === 2.0 || String(v).toLowerCase().includes('issue');
+                        const isPos = (v: any) => (v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0)) && v !== 2 && v !== 2.0;
+                        const isIssue = (v: any) => v === 2 || v === 2.0 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
                         
                         // Apply Gradient for metrics (Density, Counts)
                         if (queryMode === 'metric' && gradientMetric && props[gradientMetric] !== undefined) {
@@ -274,15 +274,29 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         let popup = `<div class="p-2 min-w-[150px] font-sans text-xs">`;
                         popup += `<h3 class="font-bold border-b pb-1 mb-1">${name}</h3>`;
                         relevantInfraCols.forEach(k => {
-                            const isPos = (v: any) => v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0);
-                            popup += `<div class="flex justify-between py-0.5"><span>${k.replace(/_/g, ' ')}</span><span>${isPos(props[k]) ? '✅' : '❌'}</span></div>`;
+                            const isPos = (v: any) => (v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0)) && v !== 2 && v !== 2.0;
+                            const isIss = (v: any) => v === 2 || v === 2.0 || String(v).toLowerCase().includes('issue');
+                            let stat = '❌';
+                            if (isPos(props[k])) stat = '✅';
+                            else if (isIss(props[k])) stat = '⚠️';
+                            popup += `<div class="flex justify-between py-0.5"><span>${k.replace(/_/g, ' ')}</span><span>${stat}</span></div>`;
                         });
                         popup += `</div>`;
                         layer.bindPopup(popup);
 
                         layer.on("click", (e) => {
                             L.DomEvent.stopPropagation(e);
-                            if (onFeatureClick) onFeatureClick("school", name);
+                            if (onFeatureClick) {
+                                let clickLevel = "school";
+                                let clickName = name;
+                                if (feature.geometry?.type !== "Point") {
+                                    if (props.block_name) { clickLevel = "block"; clickName = props.block_name; }
+                                    else if (props.district_name) { clickLevel = "district"; clickName = props.district_name; }
+                                    onFeatureClick(clickLevel, clickName);
+                                } else {
+                                    onFeatureClick("school", clickName);
+                                }
+                            }
                         });
                     }
                 }).addTo(map);

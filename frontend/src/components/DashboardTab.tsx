@@ -284,15 +284,7 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
 
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
                     {pieData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -304,14 +296,14 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[400px]">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[400px] flex flex-col">
             <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-6 border-b pb-4">District Impact Analysis</h3>
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1">
               {districtBreakdown.length > 0 ? districtBreakdown.map((r: any, i: number) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100/50">
                     <div className="flex flex-col">
                         <span className="text-[10px] font-black text-slate-800 uppercase leading-tight">{r.name}</span>
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{r.total} Schools</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{r.total} Regions</span>
                     </div>
                     <div className="flex gap-4">
                         <div className="flex flex-col items-end">
@@ -330,17 +322,17 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
                     </div>
                 </div>
               )) : (
-                <div className="flex flex-col items-center justify-center h-48 text-slate-300">
-                    <Info size={24} className="mb-2" />
+                <div className="flex flex-col items-center justify-center h-full text-slate-300">
+                    <Info size={24} className="mb-2 opacity-50" />
                     <p className="text-[10px] font-black uppercase tracking-widest">No District Data</p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[400px]">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[400px] flex flex-col">
             <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-6 border-b pb-4">Block Impact Analysis</h3>
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1">
               {blockBreakdown.length > 0 ? blockBreakdown.map((r: any, i: number) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-indigo-50/30 rounded-2xl border border-indigo-100/30">
                     <div className="flex flex-col">
@@ -364,33 +356,36 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
                     </div>
                 </div>
               )) : (
-                <div className="flex flex-col items-center justify-center h-48 text-slate-300">
-                    <Info size={24} className="mb-2" />
+                <div className="flex flex-col items-center justify-center h-full text-slate-300">
+                    <Info size={24} className="mb-2 opacity-50" />
                     <p className="text-[10px] font-black uppercase tracking-widest">No Block Data</p>
                 </div>
               )}
             </div>
           </div>
-        </div>
 
-        {prioritySchools.length > 0 && (
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-             <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-6 border-b pb-4">High Priority Intervention Sites (Schools)</h3>
-             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-               {prioritySchools.map((s: any, i: number) => (
-                 <div key={i} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 flex flex-col justify-between">
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[400px] flex flex-col">
+             <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-6 border-b pb-4">High Priority Interventions (Top 5 Sites)</h3>
+             <div className="space-y-3 flex-1">
+               {prioritySchools.length > 0 ? prioritySchools.map((s: any, i: number) => (
+                 <div key={i} className="p-4 rounded-2xl border border-rose-100 bg-rose-50 flex items-center justify-between shadow-sm">
                    <div>
-                     <p className="text-[10px] font-black text-slate-800 line-clamp-2 uppercase min-h-[2.5em]">{s.name}</p>
-                     <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{s.block} Block</p>
+                     <p className="text-[10px] font-black text-slate-800 uppercase">{s.name}</p>
+                     <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{s.block} Block</p>
                    </div>
-                   <div className={`text-[10px] font-black uppercase mt-4 ${s.color}`}>
+                   <div className={`text-[9px] font-black uppercase ${s.color} bg-white px-2 py-1 rounded-md shadow-sm border border-slate-100`}>
                      {s.status}
                    </div>
                  </div>
-               ))}
+               )) : (
+                 <div className="flex flex-col items-center justify-center h-full text-emerald-400">
+                    <CheckCircle size={28} className="mb-2 opacity-70" />
+                    <p className="text-[10px] font-black uppercase tracking-widest text-center mt-2">No Priority Interventions<br/>Identified</p>
+                 </div>
+               )}
              </div>
           </div>
-        )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 bg-blue-600 text-white p-6 rounded-[32px] flex items-center gap-6 shadow-xl relative overflow-hidden group">

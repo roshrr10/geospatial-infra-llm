@@ -6288,3 +6288,45 @@ TRACE:
 NoneType: None
 
 SQL: SELECT block_name, district_name, avg_school_density FROM meghalaya_district_intelligence_final ORDER BY avg_school_density DESC LIMIT 5;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.GroupingError) column "s.geometry" must appear in the GROUP BY clause or be used in an aggregate function
+LINE 1: SELECT COUNT(s."schoolName"), geometry  FROM meghalaya_schoo...
+                                      ^
+
+[SQL: SELECT COUNT(s."schoolName"), geometry  FROM meghalaya_schools s;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT COUNT(s."schoolName") FROM meghalaya_schools s;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.GroupingError) column "s.geometry" must appear in the GROUP BY clause or be used in an aggregate function
+LINE 1: SELECT COUNT(s."schoolName"), geometry  FROM meghalaya_schoo...
+                                      ^
+
+[SQL: SELECT COUNT(s."schoolName"), geometry  FROM meghalaya_schools s;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT COUNT(s."schoolName") FROM meghalaya_schools s;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.UndefinedColumn) column "block_name" does not exist
+LINE 1: SELECT block_name, district_name, avg_school_density, geomet...
+               ^
+
+[SQL: SELECT block_name, district_name, avg_school_density, geometry  FROM meghalaya_district_intelligence_final ORDER BY avg_school_density DESC LIMIT 5;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT block_name, district_name, avg_school_density FROM meghalaya_district_intelligence_final ORDER BY avg_school_density DESC LIMIT 5;

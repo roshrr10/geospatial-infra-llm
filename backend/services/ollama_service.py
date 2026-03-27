@@ -81,10 +81,32 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
-    # Districts with highest road density
+    # Global school counts ("how many schools do we have")
+    if 'how many school' in q_lower or 'total school' in q_lower:
+        if 'district' not in q_lower and 'block' not in q_lower:
+            sql = "SELECT 'Meghalaya' as state_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_district_intelligence_final;"
+            result = (sql, "state")
+            llm_cache.set(question, result)
+            return result
+
+    # Districts with highest road density / Compare road density
     if 'road density' in q_lower:
         sql = "SELECT district_name, avg_road_density, geometry FROM meghalaya_district_intelligence_final ORDER BY avg_road_density DESC;"
         result = (sql, "district")
+        llm_cache.set(question, result)
+        return result
+
+    # Districts with highest school density
+    if 'school density' in q_lower and 'district' in q_lower:
+        sql = "SELECT district_name, avg_school_density, geometry FROM meghalaya_district_intelligence_final ORDER BY avg_school_density DESC;"
+        result = (sql, "district")
+        llm_cache.set(question, result)
+        return result
+
+    # Blocks with highest school density
+    if 'school density' in q_lower and 'block' in q_lower:
+        sql = "SELECT block_name, district_name, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final ORDER BY schools_per_sqkm DESC;"
+        result = (sql, "block")
         llm_cache.set(question, result)
         return result
     
