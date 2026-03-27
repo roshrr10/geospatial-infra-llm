@@ -20,8 +20,8 @@ If the user says "Hi", "Hello", "Thanks", or asks "Who are you?" / "How can you 
 If the user asks for ANY infrastructure data or counts (e.g., "schools with...", "no electricity", "districts with most schools", "how many..."):
 - RESPONSE: Return ONLY valid PostGIS SQL. No prose, no [CHAT] tags, no explanations.
 - STRICT RULE: Do NOT write "Here is the SQL query". Start your response immediately with `SELECT`.
-- JOIN RULE (Schools): Always use this exact join clause:
-  `FROM meghalaya_schools s LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)`
+- JOIN RULE (Schools): Always use this exact join clause with explicit type casting:
+  `FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text`
 - COLUMNS RULE: Always use `s."schoolName"` for the school name. NEVER use `s.name`.
 - ADMIN INTELLIGENCE TABLES (use for district/block level trends):
   - `meghalaya_district_intelligence_final` (Columns: `district_name`, `geometry`, `avg_school_density`, `avg_road_density`)
@@ -90,7 +90,7 @@ async def get_sql_from_llm(question: str):
             return result
 
     # Districts with highest road density / Compare road density
-    if 'road density' in q_lower:
+    if 'road density' in q_lower and 'district' in q_lower:
         sql = "SELECT district_name, avg_road_density, geometry FROM meghalaya_district_intelligence_final ORDER BY avg_road_density DESC;"
         result = (sql, "district")
         llm_cache.set(question, result)
@@ -104,7 +104,7 @@ async def get_sql_from_llm(question: str):
         return result
 
     # Blocks with highest school density
-    if 'school density' in q_lower and 'block' in q_lower:
+    if ('school density' in q_lower or 'per sqkm' in q_lower or 'sq.km' in q_lower) and 'block' in q_lower:
         sql = "SELECT block_name, district_name, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final ORDER BY schools_per_sqkm DESC;"
         result = (sql, "block")
         llm_cache.set(question, result)
@@ -115,7 +115,7 @@ async def get_sql_from_llm(question: str):
         dists = ["EAST KHASI HILLS", "WEST KHASI HILLS", "SOUTH WEST KHASI HILLS", "RI BHOI", "EAST JAINTIA HILLS", "WEST JAINTIA HILLS", "EAST GARO HILLS", "WEST GARO HILLS", "SOUTH GARO HILLS", "SOUTH WEST GARO HILLS", "NORTH GARO HILLS"]
         target_dist = next((d for d in dists if d.lower() in q_lower), "")
         if target_dist:
-            sql = f"SELECT block_name, district_name, total_schools, schools_per_sqkm, road_density_km_per_sqkm, geometry FROM meghalaya_block_intelligence_final WHERE district_name = '{target_dist}' ORDER BY total_schools DESC;"
+            sql = f"SELECT block_name, district_name, total_schools, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final WHERE district_name = '{target_dist}' ORDER BY total_schools DESC;"
             result = (sql, "block")
             llm_cache.set(question, result)
             return result
@@ -161,25 +161,34 @@ async def get_sql_from_llm(question: str):
     # --- DENSITY & AGGREGATE FALLBACKS ---
     if 'road density' in q_lower and 'district' in q_lower:
         sql = """-- NO_STRIP
-                 SELECT district_name, road_density_km_per_sqkm as road_density 
+                 SELECT district_name, avg_road_density 
                  FROM meghalaya_district_intelligence_final 
-                 ORDER BY road_density DESC;"""
+                 ORDER BY avg_road_density DESC;"""
         result = (sql, "district")
         llm_cache.set(question, result)
         return result
 
-    if 'school density' in q_lower and 'block' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT block_name, district_name, schools_per_sqkm as school_density 
-                 FROM meghalaya_block_intelligence_final 
-                 ORDER BY school_density DESC;"""
-        result = (sql, "block")
-        llm_cache.set(question, result)
-        return result
+    if 'school density' in q_lower or 'per sqkm' in q_lower:
+        if 'block' in q_lower:
+            sql = """-- NO_STRIP
+                     SELECT block_name, district_name, schools_per_sqkm as school_density 
+                     FROM meghalaya_block_intelligence_final 
+                     ORDER BY school_density DESC;"""
+            result = (sql, "block")
+            llm_cache.set(question, result)
+            return result
+        elif 'district' in q_lower:
+            sql = """-- NO_STRIP
+                     SELECT district_name, avg_school_density as school_density 
+                     FROM meghalaya_district_intelligence_final 
+                     ORDER BY school_density DESC;"""
+            result = (sql, "district")
+            llm_cache.set(question, result)
+            return result
 
     if 'total schools' in q_lower and 'district' in q_lower:
         sql = """-- NO_STRIP
-                 SELECT district_name, total_schools 
+                 SELECT district_name, avg_total_schools as total_schools 
                  FROM meghalaya_district_intelligence_final 
                  ORDER BY total_schools DESC;"""
         result = (sql, "district")
