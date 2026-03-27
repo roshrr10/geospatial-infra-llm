@@ -128,8 +128,7 @@ async def get_sql_from_llm(question: str):
                  i.no_of_computer, i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
                  s.geometry
                  FROM meghalaya_schools s
-                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
-                 WHERE i.no_of_computer > 0 AND i.smart_classroom_available_in_school_1_yes_2_no = 1;"""
+                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11);"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
@@ -141,8 +140,7 @@ async def get_sql_from_llm(question: str):
                  i.electricity_connection_available, i.drinking_water_availability,
                  s.geometry
                  FROM meghalaya_schools s
-                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
-                 WHERE i.electricity_connection_available = 1 AND i.drinking_water_availability = 1;"""
+                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11);"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
@@ -155,8 +153,7 @@ async def get_sql_from_llm(question: str):
                  i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
                  s.geometry
                  FROM meghalaya_schools s
-                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
-                 WHERE i.internet_facility_available_in_school_1_yes_2_no = 1 AND i.smart_classroom_available_in_school_1_yes_2_no = 1;"""
+                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11);"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
@@ -167,8 +164,7 @@ async def get_sql_from_llm(question: str):
                  SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
                  i.electricity_connection_available, s.geometry
                  FROM meghalaya_schools s
-                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
-                 WHERE (i.electricity_connection_available = 0 OR i.electricity_connection_available IS NULL);"""
+                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11);"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result

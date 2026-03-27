@@ -192,11 +192,11 @@ export default function Dashboard() {
       // Detect user intent to guide the map's filterMode without throwing away table stats
       const queryLower = q.toLowerCase();
       let detectedIntent: 'all' | 'yes' | 'no' | 'issue' = 'all';
-      if (/\b(without|no|lack|missing|need|don't have|dont have|needs)\b/.test(queryLower)) {
+      if (/\b(without|no|lack|missing|need|don't have|dont have|needs|lacking)\b/.test(queryLower)) {
           detectedIntent = 'no';
-      } else if (/\b(issue|problem|broken|functional issue|repair)\b/.test(queryLower)) {
+      } else if (/\b(issue|problem|broken|functional issue|repair|partial)\b/.test(queryLower)) {
           detectedIntent = 'issue';
-      } else if (/\b(both|all|have|with)\b/.test(queryLower)) {
+      } else if (/\b(both|all|have|with|equipped)\b/.test(queryLower)) {
           detectedIntent = 'yes';
       }
       setMapFilterIntent(detectedIntent);
