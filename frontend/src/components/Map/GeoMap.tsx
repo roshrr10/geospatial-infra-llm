@@ -176,30 +176,38 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             return defaultStyle;
         };
 
+        // BASMAP LAYER (Polygons)
         if (basemap) {
-            if (basemapLayerRef.current) map.removeLayer(basemapLayerRef.current);
-            basemapLayerRef.current = L.geoJSON(basemap, {
-                style: getChoroplethStyle,
-                onEachFeature: (feature, layer) => {
-                    const name = feature.properties?.block_name || feature.properties?.district_name || "Region";
-                    layer.bindTooltip(`<div class="font-sans text-[10px] font-bold p-1">${name}</div>`, { sticky: true });
-                    layer.on({
-                        mouseover: (e: any) => { e.target.setStyle({ weight: 3, color: '#3b82f6' }); e.target.bringToFront(); },
-                        mouseout: (e: any) => { if (basemapLayerRef.current) basemapLayerRef.current.resetStyle(e.target); },
-                        click: (e) => {
-                            if (onFeatureClick) {
-                                let clickLevel = currentLevel;
-                                if (feature.properties.block_name) clickLevel = "block";
-                                else if (feature.properties.district_name) clickLevel = "district";
-                                if (clickLevel !== "school") {
-                                    L.DomEvent.stopPropagation(e);
-                                    onFeatureClick(clickLevel, name);
+            if (!basemapLayerRef.current) {
+                basemapLayerRef.current = L.geoJSON(basemap, {
+                    style: getChoroplethStyle,
+                    onEachFeature: (feature, layer) => {
+                        const name = feature.properties?.block_name || feature.properties?.district_name || "Region";
+                        layer.bindTooltip(`<div class="font-sans text-[10px] font-bold p-1">${name}</div>`, { sticky: true });
+                        layer.on({
+                            click: (e) => {
+                                L.DomEvent.stopPropagation(e);
+                                if (onFeatureClick) {
+                                    onFeatureClick(currentLevel, name);
                                 }
+                            },
+                            mouseover: (e) => {
+                                const l = e.target;
+                                l.setStyle({ weight: 3, color: '#3b82f6', fillOpacity: 0.9 });
+                                l.bringToFront();
+                            },
+                            mouseout: (e) => {
+                                if (basemapLayerRef.current) basemapLayerRef.current.resetStyle(e.target);
                             }
-                        }
-                    });
-                }
-            }).addTo(map);
+                        });
+                    }
+                }).addTo(map);
+            } else {
+                // Update existing layer to prevent flicker
+                basemapLayerRef.current.clearLayers();
+                basemapLayerRef.current.addData(basemap);
+                basemapLayerRef.current.setStyle(getChoroplethStyle);
+            }
 
             if (!geojson) {
                 const bounds = basemapLayerRef.current.getBounds();

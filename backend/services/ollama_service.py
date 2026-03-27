@@ -208,6 +208,17 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
+    # RAMPS (Specific Sidebar Fix)
+    if 'ramp' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.ramp_available, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
     # NO ELECTRICITY (Direct Sidebar Fix)
     if 'no electricity' in q_lower or 'lack electricity' in q_lower:
         sql = """-- NO_STRIP
@@ -305,10 +316,14 @@ async def get_summary_from_llm(question: str, data: list):
 
     total = len(data)
     # 1. Pre-calculate Stats to guide the LLM
-    infra_cols = ['ramp_available', 'electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no']
+    infra_cols = ['ramp_available', 'electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no', 'library_facility']
     # Prioritize detecting the column that is actually in the question
     q_low = question.lower()
+    
+    # Precise match: check if the first word of the col (e.g. 'ramp') is in the question
     target_col = next((c for c in infra_cols if c in data[0] and c.split('_')[0] in q_low), None)
+    
+    # Fallback to any valid column found in both data and infra_cols
     if not target_col:
         target_col = next((c for c in infra_cols if c in data[0]), None)
     
