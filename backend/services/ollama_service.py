@@ -40,7 +40,8 @@ If the user asks for ANY infrastructure data or counts (e.g., "schools with...",
 - MULTI-METRIC RULE: If multiple items are mentioned (e.g. "both computers and smart classrooms"), include ALL relevant infra columns INDIVIDUALLY in your `SELECT` statement. This ensures the dashboard charts can show each metric.
 - ALIASING RULE: NEVER return a column without a clear name. If you use a calculation or boolean expression (e.g., `i.no_of_computer > 0`), you MUST alias it: `(i.no_of_computer > 0) as has_computers`.
 - MANDATORY COLUMNS: Always include `geometry`, identifiers (`udise_num`), AND context columns (`district_name`, `block_name`).
-- EXAMPLE: User "Schools with both electricity and water" -> Response "SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.drinking_water_availability, s.geometry FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electricity_connection_available = 1 AND i.drinking_water_availability = 1;"
+- SCAN RULE: When asked for "Schools with X" or "Schools lacking Y", generate SQL that selects ALL schools (with status columns) but do NOT include `WHERE X = 1` or `WHERE Y = 0`. The dashboard needs ALL data points to calculate the full status breakdown (With, Without, Issues).
+- EXAMPLE: User "Schools with both electricity and water" -> Response "SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.drinking_water_availability, s.geometry FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"
 """
 _model_warmed = False
 
@@ -133,12 +134,22 @@ async def get_sql_from_llm(question: str):
             llm_cache.set(question, result)
             return result
 
-    # Computers AND smart classrooms
-    if ('computer' in q_lower and 'smart' in q_lower) or ('computer' in q_lower and 'classroom' in q_lower):
+    # Computers
+    if 'computer' in q_lower:
         sql = """-- NO_STRIP
                  SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.no_of_computer, i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
-                 s.geometry
+                 i.no_of_computer, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # Smart Classrooms
+    if 'smart' in q_lower or 'classroom' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom, s.geometry
                  FROM meghalaya_schools s
                  JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
         result = (sql, "school")
@@ -218,13 +229,24 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
-    # NO ELECTRICITY (Direct Sidebar Fix)
-    if 'no electricity' in q_lower or 'lack electricity' in q_lower:
+    # ELECTRICITY (Broad Baseline Fix)
+    if 'electricity' in q_lower:
         sql = """-- NO_STRIP
                  SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
                  i.electricity_connection_available, s.geometry
                  FROM meghalaya_schools s
-                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11);"""
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # WATER (Broad Baseline Fix)
+    if 'water' in q_lower or 'drinking water' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.drinking_water_availability, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
@@ -315,7 +337,12 @@ async def get_summary_from_llm(question: str, data: list):
 
     total_analyzed = len(data)
     # 1. Pre-calculate Stats to guide the LLM
-    infra_cols = ['ramp_available', 'electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no', 'library_facility', 'internet_facility_available_in_school_1_yes_2_no']
+    infra_cols = [
+        'electricity_connection_available', 'drinking_water_availability', 'playground_available', 
+        'ramp_available', 'solar_panel', 'library_facility', 'fire_extinguisher_available_1_yes_2_no', 
+        'smart_classroom_available_in_school_1_yes_2_no', 'internet_facility_available_in_school_1_yes_2_no', 
+        'no_of_computer'
+    ]
     q_low = question.lower()
     
     # Identify ALL target columns mentioned in the question and present in data
@@ -327,39 +354,46 @@ async def get_summary_from_llm(question: str, data: list):
 
     # Calculate Joint Stats
     joint_met = 0
-    individual_stats = {c: 0 for c in target_cols}
+    joint_no = 0
+    joint_issue = 0
+    individual_stats = {c: {'yes': 0, 'no': 0, 'issue': 0} for c in target_cols}
     
-    def is_pos(val, col_name):
-        if col_name == 'no_of_computer': return (int(val) if val is not None else 0) > 0
-        return (int(val) if val is not None else 0) == 1
+    def get_status(val, col_name):
+        v = int(val) if val is not None else 0
+        if col_name == 'no_of_computer':
+            return 'yes' if v > 0 else 'no'
+        if v == 1: return 'yes'
+        if v == 2: return 'issue'
+        return 'no'
 
     for d in data:
-        all_met = True
-        for col in target_cols:
-            met = is_pos(d.get(col), col)
-            if met: individual_stats[col] += 1
-            else: all_met = False
-        if all_met: joint_met += 1
+        statuses = {col: get_status(d.get(col), col) for col in target_cols}
+        for col, stat in statuses.items():
+            individual_stats[col][stat] += 1
+        
+        if all(s == 'yes' for s in statuses.values()): joint_met += 1
+        if any(s == 'no' for s in statuses.values()): joint_no += 1
+        if any(s == 'issue' for s in statuses.values()) and not any(s == 'no' for s in statuses.values()): joint_issue += 1
 
     # 2. Optimized Prompt with Multi-Metric Context
-    stats_context = f"Total Records: {total_analyzed}\nCriteria Analyzed: {', '.join(target_cols)}\n"
-    stats_context += f"- Jointly Met (All Criteria): {joint_met} ({round(joint_met/total_analyzed*100, 1) if total_analyzed > 0 else 0}%)\n"
-    for col, count in individual_stats.items():
-        stats_context += f"- {col}: {count} Met\n"
+    stats_context = f"Total Records: {total_analyzed}\nCriteria: {', '.join(target_cols)}\n"
+    for col, stats in individual_stats.items():
+        stats_context += f"- {col}: {stats['yes']} With, {stats['no']} Without, {stats['issue']} Issues\n"
     
     prompt = f"""
 System: You are the Meghalaya GeoAI Assistant. Summarize the spatial data findings below.
 Persona: Analytical, professional Government Consultant.
-Context: Analyzed {total_analyzed} schools for {', '.join(target_cols)}.
-Findings:
+Context: Analyzed {total_analyzed} schools for gaps in {', '.join(target_cols)}.
+
 {stats_context}
+- Met all criteria: {joint_met}
 
 Rules:
-1. Return exactly 3 bullet points (Findings, Hotspots, Recommendations).
-2. Use specific percentages from the context.
-3. Keep it professional and focused on the joint condition if multiple were requested.
+1. Start with "### Analytics Summary"
+2. Provide exactly 3 bullet points: Key Findings (mention counts for all 3 categories: With, Without, Issue), Spatial Gaps, and Priority Recommendations.
+3. Be specific and data-driven.
 
-Output (3 points):
+Output:
 """
 
     payload = {
