@@ -148,15 +148,18 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         const map = mapRef.current;
 
         const getChoroplethStyle = (feature: any) => {
-            // DO NOT return grey just because geojson (dots) exists. 
-            // We want to see the density color ON the basemap polygons even with dots on top.
-            const defaultStyle = { color: "#475569", weight: 1.5, fillOpacity: 0.2, fillColor: "#cbd5e1", interactive: true };
-            const nName = normalizeName(feature.properties?.block_name || feature.properties?.district_name);
+            // 1. Hide polygons completely in Heatmap Mode
+            if (viewMode === 'heatmap') {
+                return { fillOpacity: 0, weight: 0, color: 'transparent', interactive: false };
+            }
+
+            const defaultStyle = { color: "#94a3b8", weight: 1, fillOpacity: 0.1, fillColor: "#cbd5e1", interactive: true };
+            const nName = normalizeName(feature.properties?.block_name || feature.properties?.district_name || feature.properties?.NAME || feature.properties?.name || feature.properties?.display_name);
 
             if (apiResult?.table) {
+                // AGGRESSIVE SEARCH: Look through ALL column values in every record to find the admin name
                 const record = apiResult.table.find((r: any) => {
-                    const rName = r.block_name || r.district_name || r.block || r.district || r.BLOCK || r.DISTRICT || r.name || r.display_name;
-                    return normalizeName(rName) === nName;
+                    return Object.values(r).some(val => normalizeName(String(val)) === nName);
                 });
 
                 if (record && gradientMetric) {
@@ -164,12 +167,12 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     if (!isNaN(val)) {
                         const range = metricMax - metricMin;
                         const ratio = range > 0 ? Math.min(1, Math.max(0, (val - metricMin) / range)) : (val > 0 ? 1 : 0);
-
-                        // High-contrast Vibrant Blue Palette for better visibility
-                        const r = Math.round(230 - ratio * 210); // 230 -> 20
-                        const g = Math.round(242 - ratio * 200); // 242 -> 42
-                        const b = Math.round(255 - ratio * 155); // 255 -> 100
-                        return { color: "white", weight: 1.5, fillOpacity: 0.85, fillColor: `rgb(${r},${g},${b})` };
+                        
+                        // Vibrant Royal Blue Gradient
+                        const r = Math.round(220 - ratio * 200); // 220 -> 20
+                        const g = Math.round(230 - ratio * 180); // 230 -> 50
+                        const b = Math.round(255 - ratio * 135); // 255 -> 120
+                        return { color: "white", weight: 1.5, fillOpacity: 0.9, fillColor: `rgb(${r},${g},${b})`, interactive: true };
                     }
                 }
             }
@@ -193,8 +196,10 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                             },
                             mouseover: (e) => {
                                 const l = e.target;
-                                l.setStyle({ weight: 3, color: '#3b82f6', fillOpacity: 0.9 });
-                                l.bringToFront();
+                                if (viewMode !== 'heatmap') {
+                                    l.setStyle({ weight: 3, color: '#3b82f6', fillOpacity: 0.95 });
+                                    l.bringToFront();
+                                }
                             },
                             mouseout: (e) => {
                                 if (basemapLayerRef.current) basemapLayerRef.current.resetStyle(e.target);
@@ -203,10 +208,13 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     }
                 }).addTo(map);
             } else {
-                // Update existing layer to prevent flicker
-                basemapLayerRef.current.clearLayers();
-                basemapLayerRef.current.addData(basemap);
-                basemapLayerRef.current.setStyle(getChoroplethStyle);
+                // Update style or data only if necessary
+                if (viewMode === 'heatmap') {
+                    basemapLayerRef.current.setStyle({ fillOpacity: 0, weight: 0, interactive: false });
+                } else {
+                    basemapLayerRef.current.setStyle(getChoroplethStyle);
+                    basemapLayerRef.current.bringToBack(); // Polygons stay behind dots
+                }
             }
 
             if (!geojson) {
