@@ -181,7 +181,9 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 
         // BASMAP LAYER (Polygons)
         if (basemap) {
-            if (!basemapLayerRef.current) {
+            const isFirstLoad = !basemapLayerRef.current;
+            
+            if (isFirstLoad) {
                 basemapLayerRef.current = L.geoJSON(basemap, {
                     style: getChoroplethStyle,
                     onEachFeature: (feature, layer) => {
@@ -190,34 +192,38 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         layer.on({
                             click: (e) => {
                                 L.DomEvent.stopPropagation(e);
-                                if (onFeatureClick) {
-                                    onFeatureClick(currentLevel, name);
-                                }
+                                if (onFeatureClick) onFeatureClick(currentLevel, name);
                             },
                             mouseover: (e) => {
-                                const l = e.target;
                                 if (viewMode !== 'heatmap') {
-                                    l.setStyle({ weight: 3, color: '#3b82f6', fillOpacity: 0.95 });
-                                    l.bringToFront();
+                                    e.target.setStyle({ weight: 3, color: '#3b82f6', fillOpacity: 0.95 });
+                                    e.target.bringToFront();
                                 }
                             },
                             mouseout: (e) => {
-                                if (basemapLayerRef.current) basemapLayerRef.current.resetStyle(e.target);
+                                // DO NOT use resetStyle (it uses stale closures)
+                                if (basemapLayerRef.current) {
+                                  basemapLayerRef.current.setStyle(getChoroplethStyle);
+                                }
                             }
                         });
                     }
                 }).addTo(map);
             } else {
-                // Update style or data only if necessary
+                // Update Data AND Style
+                basemapLayerRef.current.clearLayers();
+                basemapLayerRef.current.addData(basemap);
+                
                 if (viewMode === 'heatmap') {
                     basemapLayerRef.current.setStyle({ fillOpacity: 0, weight: 0, interactive: false });
                 } else {
                     basemapLayerRef.current.setStyle(getChoroplethStyle);
-                    basemapLayerRef.current.bringToBack(); // Polygons stay behind dots
+                    // Ensure it stays behind dots but above the base tiles
+                    basemapLayerRef.current?.bringToBack();
                 }
             }
 
-            if (!geojson) {
+            if (!geojson && isFirstLoad && basemapLayerRef.current) {
                 const bounds = basemapLayerRef.current.getBounds();
                 if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
             }
