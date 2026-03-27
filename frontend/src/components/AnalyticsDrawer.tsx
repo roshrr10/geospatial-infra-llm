@@ -25,7 +25,7 @@ function NearestFacilityButton({ facility, udiseCode }: { facility: string, udis
         setLoading(true);
         setError(false);
         try {
-            const res = await fetch(`http://127.0.0.1:8000/nearest/${facility}/${udiseCode}`);
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/nearest/${facility}/${udiseCode}`);
             if (!res.ok) throw new Error();
             const json = await res.json();
             if (json.data && json.data.length > 0) {
@@ -83,7 +83,7 @@ function ComparisonResults({ data, entityType }: { data: any[], entityType: stri
 
                 if (!name1 || !name2) return;
 
-                const res = await fetch(`http://127.0.0.1:8000/compare/${level}/${encodeURIComponent(name1)}/${encodeURIComponent(name2)}`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/compare/${level}/${encodeURIComponent(name1)}/${encodeURIComponent(name2)}`);
                 if (res.ok) {
                     const json = await res.json();
                     setCompData(json.data);
@@ -512,7 +512,7 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
                                 onClick={async () => {
                                     setIsExporting(true);
                                     try {
-                                        const res = await fetch('http://127.0.0.1:8000/report', {
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/report`, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({

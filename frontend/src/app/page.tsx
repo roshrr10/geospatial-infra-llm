@@ -104,7 +104,7 @@ export default function Dashboard() {
   }, [mapLevel]);
 
   const loadBasemap = useCallback((level: string) => {
-    fetch(`http://127.0.0.1:8000/basemap?level=${level}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/basemap?level=${level}`)
       .then(res => res.json())
       .then(data => setBasemapData(data))
       .catch(err => console.error("Basemap fetch failed", err));
@@ -112,7 +112,7 @@ export default function Dashboard() {
 
   const fetchHeatmap = useCallback(async (metric: string, level: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/heatmap?metric=${metric}&level=${level}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap?metric=${metric}&level=${level}`);
       const data = await response.json();
       if (data.features) {
         const points = data.features.map((f: any) => [
@@ -135,7 +135,7 @@ export default function Dashboard() {
         table: prev?.table || []
       }));
 
-      const response = await fetch(`http://127.0.0.1:8000/heatmap/summary?metric=${metric}&level=${level}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap/summary?metric=${metric}&level=${level}`);
       const data = await response.json();
       if (data.summary) {
         setApiResult((prev: any) => ({
@@ -168,7 +168,7 @@ export default function Dashboard() {
     setApiResult(null);
     setError(null);
     try {
-      const response = await fetch("http://127.0.0.1:8000/query", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: q }),
@@ -265,7 +265,7 @@ export default function Dashboard() {
 
       setIsDrawerOpen(true);
 
-      fetch("http://127.0.0.1:8000/query/summary", {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/query/summary`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: q, data: data.table }),
@@ -343,7 +343,7 @@ export default function Dashboard() {
     setIsSearching(true);
     try {
       const nextLevel = level === "district" ? "block" : "school";
-      const response = await fetch(`http://127.0.0.1:8000/drilldown/${level}/${name}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/drilldown/${level}/${name}`);
       const geojson = await response.json();
       
       if (apiResult) setHistory((h: any) => [...h, apiResult]);
@@ -390,7 +390,7 @@ export default function Dashboard() {
   const handleExportPDF = async () => {
     if (!apiResult?.table) return;
     try {
-      const response = await fetch("http://127.0.0.1:8000/report", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -415,7 +415,7 @@ export default function Dashboard() {
   const handleSendEmail = async (email: string) => {
     if (!apiResult?.table) return;
     try {
-      const response = await fetch("http://127.0.0.1:8000/send-email", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

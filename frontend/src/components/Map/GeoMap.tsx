@@ -354,7 +354,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 function StateBorder({ map }: { map: L.Map | null }) {
     useEffect(() => {
         if (!map) return;
-        fetch("http://127.0.0.1:8000/basemap?level=state")
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/basemap?level=state`)
             .then(res => res.json())
             .then(data => L.geoJSON(data, { style: { color: "#1e293b", weight: 3, fillOpacity: 0, interactive: false } }).addTo(map))
             .catch(err => console.error("State border load error", err));
