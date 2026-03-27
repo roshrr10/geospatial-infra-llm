@@ -143,6 +143,15 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                 ]
             });
             L.control.zoom({ position: 'bottomright' }).addTo(mapRef.current);
+
+            // Create high-visibility panes for layering control
+            const polygonsPane = mapRef.current.createPane('polygons');
+            polygonsPane.style.zIndex = '450';
+            polygonsPane.style.pointerEvents = 'auto';
+
+            const schoolsPane = mapRef.current.createPane('schools');
+            schoolsPane.style.zIndex = '500';
+            schoolsPane.style.pointerEvents = 'auto'; // Interactive dots
         }
 
         const map = mapRef.current;
@@ -153,13 +162,17 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                 return { fillOpacity: 0, weight: 0, color: 'transparent', interactive: false };
             }
 
-            const defaultStyle = { color: "#94a3b8", weight: 1, fillOpacity: 0.1, fillColor: "#cbd5e1", interactive: true };
-            const nName = normalizeName(feature.properties?.block_name || feature.properties?.district_name || feature.properties?.NAME || feature.properties?.name || feature.properties?.display_name);
+            const defaultStyle = { color: "#64748b", weight: 1, fillOpacity: 0.15, fillColor: "#e2e8f0", interactive: true };
+            const rawPropName = feature.properties?.block_name || feature.properties?.district_name || feature.properties?.NAME || feature.properties?.name;
+            const nName = normalizeName(rawPropName);
 
-            if (apiResult?.table) {
+            if (apiResult?.table && nName) {
                 // AGGRESSIVE SEARCH: Look through ALL column values in every record to find the admin name
                 const record = apiResult.table.find((r: any) => {
-                    return Object.values(r).some(val => normalizeName(String(val)) === nName);
+                    return Object.values(r).some(val => {
+                        const sVal = String(val);
+                        return normalizeName(sVal) === nName || sVal.toLowerCase().includes(nName) || nName.includes(sVal.toLowerCase());
+                    });
                 });
 
                 if (record && gradientMetric) {
@@ -169,71 +182,72 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         const ratio = range > 0 ? Math.min(1, Math.max(0, (val - metricMin) / range)) : (val > 0 ? 1 : 0);
                         
                         // Vibrant Royal Blue Gradient
-                        const r = Math.round(220 - ratio * 200); // 220 -> 20
-                        const g = Math.round(230 - ratio * 180); // 230 -> 50
+                        const r = Math.round(200 - ratio * 180); // 200 -> 20
+                        const g = Math.round(210 - ratio * 160); // 210 -> 50
                         const b = Math.round(255 - ratio * 135); // 255 -> 120
-                        return { color: "white", weight: 1.5, fillOpacity: 0.9, fillColor: `rgb(${r},${g},${b})`, interactive: true };
+                        return { color: "white", weight: 2, fillOpacity: 0.95, fillColor: `rgb(${r},${g},${b})`, interactive: true };
                     }
                 }
             }
             return defaultStyle;
         };
 
-        // BASMAP LAYER (Polygons)
-        if (basemap) {
-            const isFirstLoad = !basemapLayerRef.current;
-            
-            if (isFirstLoad) {
-                basemapLayerRef.current = L.geoJSON(basemap, {
-                    style: getChoroplethStyle,
-                    onEachFeature: (feature, layer) => {
-                        const name = feature.properties?.block_name || feature.properties?.district_name || "Region";
-                        layer.bindTooltip(`<div class="font-sans text-[10px] font-bold p-1">${name}</div>`, { sticky: true });
-                        layer.on({
-                            click: (e) => {
-                                L.DomEvent.stopPropagation(e);
-                                if (onFeatureClick) onFeatureClick(currentLevel, name);
-                            },
-                            mouseover: (e) => {
-                                if (viewMode !== 'heatmap') {
-                                    e.target.setStyle({ weight: 3, color: '#3b82f6', fillOpacity: 0.95 });
-                                    e.target.bringToFront();
-                                }
-                            },
-                            mouseout: (e) => {
-                                // DO NOT use resetStyle (it uses stale closures)
-                                if (basemapLayerRef.current) {
-                                  basemapLayerRef.current.setStyle(getChoroplethStyle);
-                                }
-                            }
-                        });
-                    }
-                }).addTo(map);
-            } else {
-                // Update Data AND Style
-                basemapLayerRef.current.clearLayers();
-                basemapLayerRef.current.addData(basemap);
-                
-                if (viewMode === 'heatmap') {
-                    basemapLayerRef.current.setStyle({ fillOpacity: 0, weight: 0, interactive: false });
-                } else {
-                    basemapLayerRef.current.setStyle(getChoroplethStyle);
-                    // Ensure it stays behind dots but above the base tiles
-                    basemapLayerRef.current?.bringToBack();
-                }
-            }
+        // 1. Ensure map panes exist for layering control
+        if (!map.getPane('polygons')) {
+            map.createPane('polygons');
+            const pane = map.getPane('polygons');
+            if (pane) pane.style.zIndex = '450';
+        }
+        if (!map.getPane('schools')) {
+            map.createPane('schools');
+            const pane = map.getPane('schools');
+            if (pane) pane.style.zIndex = '500';
+        }
 
-            if (!geojson && isFirstLoad && basemapLayerRef.current) {
+        // 2. BASMAP LAYER (Polygons)
+        if (basemapLayerRef.current) {
+            map.removeLayer(basemapLayerRef.current);
+            basemapLayerRef.current = null;
+        }
+
+        if (basemap && viewMode !== 'heatmap') {
+            basemapLayerRef.current = L.geoJSON(basemap, {
+                pane: 'polygons',
+                style: getChoroplethStyle,
+                onEachFeature: (feature, layer) => {
+                    const name = feature.properties?.block_name || feature.properties?.district_name || "Region";
+                    layer.bindTooltip(`<div class="font-sans text-[10px] font-bold p-1">${name}</div>`, { sticky: true });
+                    layer.on({
+                        click: (e) => {
+                            L.DomEvent.stopPropagation(e);
+                            if (onFeatureClick) onFeatureClick(currentLevel, name);
+                        },
+                        mouseout: (e) => {
+                            if (basemapLayerRef.current) {
+                                basemapLayerRef.current.setStyle((f: any) => getChoroplethStyle(f));
+                            }
+                        }
+                    });
+                }
+            }).addTo(map);
+
+            // Force immediate style application
+            basemapLayerRef.current.setStyle(getChoroplethStyle);
+
+            if (!geojson) {
                 const bounds = basemapLayerRef.current.getBounds();
                 if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
             }
         }
+        
+        map.invalidateSize();
 
         if (geojson || apiResult?.table) {
             if (geojsonLayerRef.current) map.removeLayer(geojsonLayerRef.current);
             
             if (geojson) {
                 geojsonLayerRef.current = L.geoJSON(geojson, {
+                    pane: 'schools',
                     filter: (feature) => {
                         if (filterMode === 'all') return true;
                         const props = feature.properties || {};
