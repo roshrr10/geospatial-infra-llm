@@ -231,6 +231,19 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         const isPos = (v: any) => v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0);
                         const isIssue = (v: any) => v === 2 || v === 2.0 || String(v).toLowerCase().includes('issue');
                         
+                        // Apply Gradient for metrics (Density, Counts)
+                        if (queryMode === 'metric' && gradientMetric && props[gradientMetric] !== undefined) {
+                            const val = parseFloat(props[gradientMetric]);
+                            if (!isNaN(val)) {
+                                const range = metricMax - metricMin;
+                                const ratio = range > 0 ? Math.min(1, Math.max(0, (val - metricMin) / range)) : (val > 0 ? 1 : 0);
+                                const r = Math.round(240 - ratio * 225);
+                                const g = Math.round(249 - ratio * 226);
+                                const b = Math.round(255 - ratio * 175);
+                                return { color: "white", weight: 1.5, opacity: 1, fillColor: `rgb(${r},${g},${b})`, fillOpacity: 0.85 };
+                            }
+                        }
+
                         if (queryMode === 'multi_binary') {
                             const score = relevantInfraCols.filter(k => isPos(props[k])).length;
                             const issues = relevantInfraCols.filter(k => isIssue(props[k])).length;

@@ -6232,3 +6232,59 @@ TRACE:
 NoneType: None
 
 SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.electricity_connection_available as electricity_availability FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electricity_connection_available = 0 AND i.electricity_connection_availability IS NOT NULL;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.UndefinedColumn) column i.electricity_connection_availability does not exist
+LINE 1: ...m::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electric...
+                                                             ^
+
+[SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.electricity_connection_available as electricity_availability, geometry  FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electricity_connection_availability IS NOT NULL;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.electricity_connection_available as electricity_availability FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electricity_connection_available = 0 AND i.electricity_connection_availability IS NOT NULL;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.UndefinedColumn) column i.electricity_connection_availability does not exist
+LINE 1: ...m::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electric...
+                                                             ^
+
+[SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.electricity_connection_available as electricity_availability, geometry  FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electricity_connection_availability IS NOT NULL;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.electricity_connection_available as electricity_availability FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electricity_connection_available = 0 AND i.electricity_connection_availability IS NOT NULL;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.UndefinedColumn) column i.electricity_connection_availability does not exist
+LINE 1: ...m::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electric...
+                                                             ^
+
+[SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.electricity_connection_available as electricity_availability, geometry  FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electricity_connection_availability IS NOT NULL;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.electricity_connection_available as electricity_availability FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11) WHERE i.electricity_connection_available = 0 AND i.electricity_connection_availability IS NOT NULL;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.UndefinedColumn) column "block_name" does not exist
+LINE 1: SELECT block_name, district_name, avg_school_density, geomet...
+               ^
+
+[SQL: SELECT block_name, district_name, avg_school_density, geometry  FROM meghalaya_district_intelligence_final ORDER BY avg_school_density DESC LIMIT 5;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT block_name, district_name, avg_school_density FROM meghalaya_district_intelligence_final ORDER BY avg_school_density DESC LIMIT 5;

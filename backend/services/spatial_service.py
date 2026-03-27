@@ -173,6 +173,9 @@ def execute_spatial_query(sql: str, user_query: str = ""):
     # Hallucinated computer mapping
     sql = re.sub(r'\bi\.computer_available\b', 'i.computer_room', sql, flags=re.IGNORECASE)
     sql = re.sub(r'\bi\.computer_facility\b', 'i.computer_room', sql, flags=re.IGNORECASE)
+    
+    # Hallucinated electricity mapping derived from drinking_water_availability structure
+    sql = re.sub(r'\belectricity_connection_availability\b', 'electricity_connection_available', sql, flags=re.IGNORECASE)
 
 
     if sql != original_sql:
