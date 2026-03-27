@@ -279,9 +279,10 @@ def execute_spatial_query(sql: str, user_query: str = ""):
             sql = re.sub(r'SELECT\s+', f'SELECT {replacement}', sql, count=1, flags=re.IGNORECASE)
 
     # 1.10.2 Robust Filter Stripping
-    for col in infra_status_cols:
-        # Remove 'AND i.col = X'
-        sql = re.sub(r'\s+AND\s+([\w\.]+\.)?' + re.escape(col) + r'\s*[=<>!]+\s*[\d\w\']+', '', sql, flags=re.IGNORECASE)
+    if "-- NO_STRIP" not in sql:
+        for col in infra_status_cols:
+            # Remove 'AND i.col = X'
+            sql = re.sub(r'\s+AND\s+([\w\.]+\.)?' + re.escape(col) + r'\s*[=<>!]+\s*[\d\w\']+', '', sql, flags=re.IGNORECASE)
         # Remove 'WHERE i.col = X AND ...' -> 'WHERE ...'
         sql = re.sub(r'WHERE\s+([\w\.]+\.)?' + re.escape(col) + r'\s*[=<>!]+\s*[\d\w\']+\s+AND\s+', 'WHERE ', sql, flags=re.IGNORECASE)
         # Remove 'WHERE i.col = X' at the end or before order/limit

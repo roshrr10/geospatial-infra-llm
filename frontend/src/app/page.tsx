@@ -670,7 +670,20 @@ export default function Dashboard() {
           {viewTab === "map" ? (
             <>
               <LayerControl activeMetric={activeMetric} onMetricChange={setActiveMetric} viewMode={viewMode} onModeChange={setViewMode} adminLevel={mapLevel as any} onLevelChange={setMapLevel} dynamicOptions={dynamicMetrics} />
-              <GeoMap geojson={apiResult?.geojson} basemap={basemapData} currentLevel={mapLevel} onLevelChange={setMapLevel} onFeatureClick={handleFeatureClick} heatmapData={heatmapData} activeMetric={activeMetric} searchQuery={lastSearch} initialFilterIntent={mapFilterIntent} viewMode={viewMode} apiResult={apiResult} />
+              <GeoMap 
+                key={`${mapLevel}_${apiResult?.geojson?.features?.length || 0}_${lastSearch}`}
+                geojson={apiResult?.geojson} 
+                basemap={basemapData} 
+                currentLevel={mapLevel} 
+                onLevelChange={setMapLevel} 
+                onFeatureClick={handleFeatureClick} 
+                heatmapData={heatmapData} 
+                activeMetric={activeMetric} 
+                searchQuery={lastSearch} 
+                initialFilterIntent={mapFilterIntent} 
+                viewMode={viewMode} 
+                apiResult={apiResult} 
+              />
               <div className="absolute bottom-8 right-8 z-[1000] glass p-4 rounded-2xl w-64 space-y-2 shadow-2xl border border-white/20">
                 <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Sync</h4>
                 <div className="flex items-center gap-3">

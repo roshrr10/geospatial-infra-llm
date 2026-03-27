@@ -267,32 +267,36 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[400px]">
             <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-6 border-b pb-4">Status Distribution (Dataset Wide)</h3>
-            <div className="h-72 w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{fontSize: 9, fill: '#64748b', fontWeight: 700}} />
-                  <YAxis tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 700}} />
-                  <Tooltip cursor={{fill: 'transparent'}} wrapperClassName="text-xs font-bold shadow-xl border-0" contentStyle={{ borderRadius: '12px', border: 'none' }} />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={50}>
-                    {barData.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="h-72 w-full flex flex-col md:flex-row gap-4">
+              <div className="flex-1 min-h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" tick={{fontSize: 9, fill: '#64748b', fontWeight: 700}} />
+                    <YAxis tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 700}} />
+                    <Tooltip cursor={{fill: 'transparent'}} wrapperClassName="text-xs font-bold shadow-xl border-0" contentStyle={{ borderRadius: '12px', border: 'none' }} />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={50}>
+                      {barData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
 
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                    {pieData.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip wrapperClassName="text-xs font-bold" />
-                  <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="flex-1 min-h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                      {pieData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip wrapperClassName="text-xs font-bold" />
+                    <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 

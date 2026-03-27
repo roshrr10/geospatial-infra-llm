@@ -1,26 +1,18 @@
+import sys
+sys.path.append('.')
+from backend.database.db import engine
 import pandas as pd
-from sqlalchemy import create_engine, text
-import json
 
-engine = create_engine("postgresql://postgres:7654@localhost:5433/meghalaya_geo_llm")
-
-def check_structure():
-    output = []
-    keys = ['ramp_available', 'library_facility', 'electricity_connection_available', 'no_of_computer']
-    try:
-        with engine.connect() as conn:
-            for k in keys:
-                output.append(f"\n--- Distinct values for {k} ---")
-                res = conn.execute(text(f"SELECT \"{k}\", count(*) FROM meghalaya_infrastructure GROUP BY 1")).fetchall()
-                for r in res:
-                    output.append(f"{r[0]}: {r[1]}")
-                
-        with open("db_values.txt", "w") as f:
-            f.write("\n".join(output))
-        print("Done. See db_values.txt")
-            
-    except Exception as e:
-        print(f"Error: {e}")
-
-if __name__ == "__main__":
-    check_structure()
+try:
+    tables = pd.read_sql("SELECT table_name FROM information_schema.tables WHERE table_schema='public'", engine)
+    print("Tables in database:")
+    print(tables)
+    
+    for table in ['meghalaya_schools', 'meghalaya_infrastructure', 'meghalaya_district_intelligence_final', 'meghalaya_block_intelligence_final']:
+        if table in tables['table_name'].values:
+            count = pd.read_sql(f"SELECT count(*) FROM {table}", engine).iloc[0,0]
+            print(f"Table {table}: {count} rows")
+        else:
+            print(f"Table {table}: MISSING")
+except Exception as e:
+    print(f"Error: {e}")

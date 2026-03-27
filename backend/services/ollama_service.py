@@ -123,7 +123,8 @@ async def get_sql_from_llm(question: str):
     # ---- MULTI-INFRASTRUCTURE FALLBACKS ----
     # Computers AND smart classrooms
     if ('computer' in q_lower and 'smart' in q_lower) or ('computer' in q_lower and 'classroom' in q_lower):
-        sql = """SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
                  i.no_of_computer, i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
                  s.geometry
                  FROM meghalaya_schools s
@@ -135,7 +136,8 @@ async def get_sql_from_llm(question: str):
 
     # Electricity AND water
     if ('electricity' in q_lower and 'water' in q_lower):
-        sql = """SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
                  i.electricity_connection_available, i.drinking_water_availability,
                  s.geometry
                  FROM meghalaya_schools s
@@ -147,13 +149,26 @@ async def get_sql_from_llm(question: str):
 
     # Internet AND smart classrooms  
     if ('internet' in q_lower and 'smart' in q_lower):
-        sql = """SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
                  i.internet_facility_available_in_school_1_yes_2_no as internet_available,
                  i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
                  s.geometry
                  FROM meghalaya_schools s
                  LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
                  WHERE i.internet_facility_available_in_school_1_yes_2_no = 1 AND i.smart_classroom_available_in_school_1_yes_2_no = 1;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # NO ELECTRICITY (Direct Sidebar Fix)
+    if 'no electricity' in q_lower or 'lack electricity' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.electricity_connection_available, s.geometry
+                 FROM meghalaya_schools s
+                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
+                 WHERE (i.electricity_connection_available = 0 OR i.electricity_connection_available IS NULL);"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
@@ -235,170 +250,62 @@ async def get_sql_from_llm(question: str):
         return result
 
 async def get_summary_from_llm(question: str, data: list):
-    # Check Cache
-    cache_key = f"{question}_{len(data)}"
+    """Instant Python-based summary generator to avoid slow LLM sequential calls."""
+    cache_key = f"summary_{question}_{len(data)}"
     cached = summary_cache.get(cache_key)
-    if cached:
-        logger.info(f"SUMMARY CACHE HIT for: {question}")
-        return cached
+    if cached: return cached
 
-    if not data:
-        return "No data points found for the requested query."
-
-    total_records = len(data)
+    if not data: return "No data points found."
     
-    # Identify the primary numeric metric or binary field with robust skip-list and prioritization
-    sample = data[0]
-    skip_keywords = [
-        'id', 'code', 'udise', 'sl_no', 'geometry', 'pinc', 'index', 'serial', 
-        'mobi', 'phone', 'latitude', 'longitude', 'altitude', 'accuracy',
-        'class', 'grade', 'year', 'month'
+    total = len(data)
+    q_lower = question.lower()
+    
+    # 1. Detect Infrastructure Columns
+    infra_cols = [
+        'electricity_connection_available', 'drinking_water_availability', 
+        'playground_available', 'ramp_available', 'no_of_computer', 
+        'smart_classroom_available_in_school_1_yes_2_no', 'internet_facility_available_in_school_1_yes_2_no'
     ]
     
-    # Identify keys by checking up to 50 rows (handle NULLs)
-    all_keys = sample.keys()
-    metric_keys = []
-    for k in all_keys:
-        k_lower = k.lower()
-        if any(skip in k_lower for skip in skip_keywords):
-            continue
-        if any(isinstance(row.get(k), (int, float)) for row in data[:50]):
-            metric_keys.append(k)
-    
-    def score_metric(k):
-        k_lower = k.lower()
-        if 'solar' in k_lower: return 200
-        if 'electricity' in k_lower or 'eletricity' in k_lower: return 150
-        if 'computer' in k_lower or 'water' in k_lower: return 140
-        if 'available' in k_lower or 'facility' in k_lower: return 130
-        if 'class' in k_lower or 'grade' in k_lower: return -100
-        return 0
+    target_col = next((c for c in infra_cols if c in data[0]), None)
+    label = target_col.replace('_', ' ').title() if target_col else "Infrastructure"
 
-    metric_keys.sort(key=score_metric, reverse=True)
-    primary_metric = metric_keys[0] if metric_keys else None
+    # 2. Calculate Aggregates Instantly
+    yes = 0
+    no = 0
+    issue = 0
     
-    def check_val(v, target):
-        if v is None: return False
-        v_str = str(v).lower().strip()
-        if not v_str or v_str in ['n/a', 'null', 'nan']:
-            return False
-        # Unified YES Definition: Matches GeoMap and Page logic
-        positives = ['1', '1.0', 'yes', 'true', 'functional', 'satisfactory', 'available', 'provided']
-        negatives = ['0', '0.0', 'no', 'false', 'none', 'unavailable', 'missing']
-        
-        if target == 'yes':
-            return v == 1 or v == 1.0 or v_str in positives
-        if target == 'no':
-            return v == 0 or v == 0.0 or v_str in negatives
-        if target == 'issue':
-            return v == 2 or v == 2.0 or 'issue' in v_str or 'partial' in v_str or 'repair' in v_str or 'not functional' in v_str
-        return False
+    for d in data:
+        v = d.get(target_col)
+        if v == 1 or v == 1.0 or str(v).lower() == 'yes': yes += 1
+        elif v == 0 or v == 0.0 or str(v).lower() == 'no' or v is None: no += 1
+        elif v == 2 or v == 2.0 or 'issue' in str(v).lower(): issue += 1
 
-    # Detection of multi-infrastructure queries
-    infra_keywords = ['solar', 'panel', 'electricity', 'eletricity', 'water', 'toilet', 'computer', 'facility', 'internet', 'smart', 'ramp', 'playground', 'lab', 'library', 'boundary', 'quarters', 'furniture', 'books', 'extinguisher', 'uniform', 'textbook', 'hostel', 'room', 'handwash', 'equipment', 'laboratory', 'board', 'projector', 'tablet', 'desktop', 'laptop', 'sanitary']
+    # 3. Dynamic Template Injection
+    insight = f"### Analytics Summary\n\n"
+    insight += f"Analyzed **{total}** records for **{label}**.\n\n"
     
-    # Filter detected_infra based on what's actually in the data
-    detected_infra = [k for k in metric_keys if any(ik in k.lower() for ik in infra_keywords)]
-    
-    # If the user's question mentions specific items, we prioritize those but keep others for context
-    q_lower = question.lower()
-    targeted = [k for k in detected_infra if any(ik in k.lower() and ik in q_lower for ik in infra_keywords)]
-    if targeted:
-        detected_infra = targeted
-
-    is_multi_infra = len(detected_infra) > 1
-
-    stats_prompt = f"Total records analyzed: {total_records}\n"
-    
-    if is_multi_infra:
-        # INTERSECTION LOGIC: All facilities must be 'Yes'
-        yes = len([d for d in data if all(check_val(d.get(k), 'yes') for k in detected_infra)])
-        no = len([d for d in data if all(check_val(d.get(k), 'no') for k in detected_infra)])
-        partial = total_records - yes - no
-        
-        infra_labels = [k.replace('_', ' ').title() for k in detected_infra]
-        stats_prompt += f"Selected Infrastructure Suite: {', '.join(infra_labels)}\n"
-        stats_prompt += f"- Fully Equipped (All Met) Count: {yes}\n"
-        stats_prompt += f"- Completely Lacking (None Met) Count: {no}\n"
-        stats_prompt += f"- Partially Equipped Count: {partial}\n"
-    elif primary_metric:
-        label = primary_metric.replace('_', ' ').title()
-        # Check if it's binary
-        is_binary = all(check_val(d.get(primary_metric), 'yes') or 
-                       check_val(d.get(primary_metric), 'no') or 
-                       check_val(d.get(primary_metric), 'issue') or 
-                       d.get(primary_metric) is None 
-                       for d in data[:300])
-        
-        if is_binary:
-            yes = len([d for d in data if check_val(d.get(primary_metric), 'yes')])
-            no = len([d for d in data if check_val(d.get(primary_metric), 'no')])
-            issue = len([d for d in data if check_val(d.get(primary_metric), 'issue')])
-            stats_prompt += f"Metric: {label}\n"
-            stats_prompt += f"- Positive/Available: {yes}\n"
-            stats_prompt += f"- Negative/Unavailable: {no}\n"
-            stats_prompt += f"- Functional Issues/Partial: {issue}\n"
-        else:
+    if yes + no + issue > 0:
+        insight += f"• **Coverage:** {yes} sites ({round(yes/total*100, 1)}%) meet the full operational requirements.\n"
+        insight += f"• **Missing Assets:** {no} sites completely lack the required infrastructure.\n"
+        insight += f"• **Repair Backlog:** {issue} sites have partial or defective equipment requiring intervention.\n"
+    else:
+        # Fallback for non-binary metrics (counts/density)
+        metric_col = next((k for k in data[0].keys() if any(m in k for m in ['total', 'density', 'count', 'per_sqkm'])), None)
+        if metric_col:
             try:
-                numeric_vals = [float(d.get(primary_metric, 0)) for d in data if d.get(primary_metric) is not None]
-                stats_prompt += f"- Average Value: {round(avg_val, 2)}\n"
-                best_id = max_item.get('schoolName') or max_item.get('block_name') or max_item.get('district_name') or 'N/A'
-                stats_prompt += f"- Highest Value: {best_id} ({max_item.get(primary_metric)})\n"
+                max_item = max([d for d in data if d.get(metric_col) is not None], key=lambda x: float(x.get(metric_col, 0)), default={})
+                highest_name = max_item.get('schoolName') or max_item.get('block_name') or max_item.get('district_name') or 'N/A'
+                insight += f"• **Top Metric:** Found {highest_name} with the highest values for {metric_col.replace('_', ' ')}.\n"
+                insight += f"• **Regional Snapshot:** Analyzed distribution across {total} administrative units."
             except:
-                stats_prompt += f"Data Column: {label}\n- Primary values detected: {data[0].get(primary_metric)}\n"
+                insight += f"• **Analysis Complete:** Successfully processed {total} records for map visualization."
+        else:
+            insight += f"• **Analysis Complete:** Successfully processed {total} records for map visualization."
 
-    # Add localized samples for geographic grounding
-    stats_prompt += "\nGeographic Samples (Top 5):\n"
-    for d in data[:5]:
-        name = d.get('schoolName') or d.get('display_name') or d.get('schname') or "N/A"
-        block = d.get('block_name') or d.get('BLOCK') or "N/A"
-        dist = d.get('district_name') or d.get('DISTRICT') or "N/A"
-        stats_prompt += f"- {name} in {block} Block, {dist} District\n"
-
-    # Context for LLM - STRICT ENFORCEMENT OF AGGREGATES
-    prompt = f"""
-System: You are an expert GeoAI Analyst for the Government of Meghalaya.
-Your task is to summarize the following SPATIAL STATISTICS.
-
-CRITICAL RULES:
-1. USE ONLY the exact numbers provided in the 'Summarized Data' section below.
-2. NEVER invent, guess, or copy numbers from outside the 'Summarized Data'.
-3. DO NOT mention local details unless they are listed in the 'Summarized Data' or 'Sample Locations' sections.
-4. If there is a count for 'Positive/Available' or 'All Requirements Met', highlight that and refer to a few representative blocks/districts from the samples if they align.
-5. Provide exactly 3 bullet points.
-6. STICK TO THE FACTS: Output only the exact counts calculated in the Summarized Data.
-
-User Question: {question}
-Summarized Data:
-{stats_prompt}
-
-Insight (exactly 3 bullets):
-1. Key Findings: [Summary of counts and percentages]
-2. Geographic Focus: [Identify the most affected blocks or districts based on regional data]
-3. Recommendation: [One actionable step for government intervention based on these specific results]
-"""
-
-    # Debug Log
-    print(f"--- AI Summary Prompt (Aggregated) ---\n{stats_prompt}\n----------------------------------")
-
-    payload = {
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.0,
-            "num_predict": 200
-        }
-    }
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(OLLAMA_URL, json=payload, timeout=30.0)
-            data_json = response.json()
-            return data_json.get("response", "Spatial analysis complete.").strip()
-    except Exception as e:
-        print(f"Summary LLM Error: {e}")
-        return f"Analysis complete for {total_records} records."
+    # Cache and return instantly
+    summary_cache.set(cache_key, insight.strip())
+    return insight.strip()
 
 async def get_heatmap_summary(metric: str, level: str, data: list):
     """
