@@ -201,11 +201,11 @@ export default function Dashboard() {
       // Detect user intent to guide the map's filterMode without throwing away table stats
       const queryLower = q.toLowerCase();
       let detectedIntent: 'all' | 'yes' | 'no' | 'issue' = 'all';
-      if (/\b(without|no|lack|missing|need|don't have|dont have|needs|lacking)\b/.test(queryLower)) {
+      if (/\b(without|no|lack|missing|need|don't have|dont have|needs|lacking|unavailable|zero|none)\b/.test(queryLower)) {
           detectedIntent = 'no';
-      } else if (/\b(issue|problem|broken|functional issue|repair|partial)\b/.test(queryLower)) {
+      } else if (/\b(issue|problem|broken|functional issue|repair|partial|working condition)\b/.test(queryLower)) {
           detectedIntent = 'issue';
-      } else if (/\b(both|all|have|with|equipped)\b/.test(queryLower)) {
+      } else if (/\b(both|all|have|with|equipped|provided|available|functional)\b/.test(queryLower)) {
           detectedIntent = 'yes';
       }
       setMapFilterIntent(detectedIntent);
@@ -253,7 +253,8 @@ export default function Dashboard() {
                     const v = row[k];
                     const val = Number(v);
                     if (val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available') return 'pos';
-                    if (val === 0 || val === 2 || String(v).toLowerCase().trim() === 'no' || String(v).toLowerCase().trim() === 'unavailable') return 'neg';
+                    if (val === 0 || String(v).toLowerCase().trim() === 'no' || String(v).toLowerCase().trim() === 'unavailable') return 'neg';
+                    if (val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial')) return 'iss';
                     return 'iss';
                 });
                 
