@@ -27,7 +27,7 @@ interface GeoMapProps {
     activeMetric?: string;
     searchQuery?: string;
     initialFilterIntent?: 'all' | 'yes' | 'no' | 'issue';
-    viewMode: "map" | "dashboard" | "heatmap";
+    viewMode: "polygon" | "map" | "dashboard" | "heatmap";
     apiResult?: any;
 }
 
