@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ScatterChart, Scatter, ZAxis
 } from 'recharts';
-import { LayoutDashboard, CheckCircle, AlertCircle, Info, Lightbulb } from 'lucide-react';
+import { LayoutDashboard, CheckCircle, AlertCircle, Info, Lightbulb, Sparkles } from 'lucide-react';
 
 interface DashboardTabProps {
   data: any[];
