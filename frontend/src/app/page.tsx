@@ -697,10 +697,6 @@ export default function Dashboard() {
                 adminLevel={mapLevel as any} 
                 onLevelChange={(level) => {
                   setMapLevel(level);
-                  if (level !== 'school') {
-                    // Wipe any point geojson data from a previous search so it doesn't block the aggregate district view!
-                    setApiResult((prev: any) => prev ? { ...prev, geojson: null } : null);
-                  }
                 }} 
                 dynamicOptions={dynamicMetrics} 
               />
