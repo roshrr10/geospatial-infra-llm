@@ -239,13 +239,21 @@ export default function Dashboard() {
         let initialActive = "";
         let finalDynamicMetrics: {id: string, label: string}[] = [];
         
+        // Find the best metric to set as active based on user's query
+        const queryWords = queryLower.split(/\W+/);
+        const mentionedCol = numericCols.find(col => {
+            const lCol = col.toLowerCase();
+            return queryWords.some(word => word.length > 3 && lCol.includes(word));
+        });
+
         if (numericCols.length > 1) {
             const compositeKey = "All Selected Facilities";
             data.table = data.table.map((row: any) => {
                 const results = numericCols.map(k => {
                     const v = row[k];
-                    if (v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'satisfactory', 'available', 'provided'].includes(String(v).toLowerCase().trim())) return 'pos';
-                    if (v === 0 || v === 0.0 || ['no', 'false', 'unavailable', 'missing', 'none'].includes(String(v).toLowerCase().trim())) return 'neg';
+                    const val = Number(v);
+                    if (val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available') return 'pos';
+                    if (val === 0 || val === 2 || String(v).toLowerCase().trim() === 'no' || String(v).toLowerCase().trim() === 'unavailable') return 'neg';
                     return 'iss';
                 });
                 
@@ -259,7 +267,8 @@ export default function Dashboard() {
                 {id: compositeKey, label: compositeKey},
                 ...numericCols.map(k => ({ id: k, label: k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))
             ];
-            initialActive = compositeKey;
+            // If user mentioned a specific column, prefer it over the composite summary
+            initialActive = mentionedCol || compositeKey;
         } else {
             finalDynamicMetrics = numericCols.map(k => ({ id: k, label: k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }));
             initialActive = numericCols[0] || "";

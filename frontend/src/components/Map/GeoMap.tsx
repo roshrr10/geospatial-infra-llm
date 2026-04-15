@@ -55,18 +55,20 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         const props = feature?.properties || {};
         const isPos = (v: any, key?: string) => {
             const val = Number(v);
-            if (key?.toLowerCase().includes('computer')) return val > 0;
-            return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
+            if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val > 0;
+            // Standard UDISE: 1 is Yes, 2 is No. Other datasets use 'yes' string.
+            return val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available' || String(v).toLowerCase().trim() === 'functional';
         };
         const isNeg = (v: any, key?: string) => {
             const val = Number(v);
-            if (key?.toLowerCase().includes('computer')) return val === 0 || v === null;
-            return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
+            if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val === 0 || v === null;
+            // Standard UDISE: 2 is No. Many datasets use 0 or 'no'.
+            return val === 0 || val === 2 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no' || String(v).toLowerCase().trim() === 'unavailable';
         };
         const isIssue = (v: any, key?: string) => {
             const val = Number(v);
-            if (key?.toLowerCase().includes('computer')) return false;
-            return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
+            // Treat specific issue strings. Note: 2 is now mostly treated as 'No' for infrastructure connection status.
+            return String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial') || String(v).toLowerCase().includes('broken');
         };
 
         if (currentQueryMode === 'multi_binary') {
@@ -126,8 +128,9 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         let max = -Infinity;
         let finalMode: 'multi_binary' | 'single_binary' | 'metric' | 'default' = 'default';
 
-        const dataKeys = (geojson?.features?.[0]?.properties ? Object.keys(geojson.features[0].properties) : [])
-            .concat(apiResult?.table?.[0] ? Object.keys(apiResult.table[0]) : []);
+        // Prioritize keys from the API query result over the background basemap properties
+        const dataKeys = (apiResult?.table?.[0] ? Object.keys(apiResult.table[0]) : [])
+            .concat(geojson?.features?.[0]?.properties ? Object.keys(geojson.features[0].properties) : []);
         const keys = Array.from(new Set(dataKeys));
 
         const isBinaryCol = (k: string) => bKeys.some(bk => k.toLowerCase().includes(bk)) && !sKeys.has(k.toLowerCase());
@@ -417,11 +420,9 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         let popup = `<div class="p-2 min-w-[150px] font-sans text-xs">`;
                         popup += `<h3 class="font-bold border-b pb-1 mb-1">${name}</h3>`;
                         relevantInfraCols.forEach(k => {
-                            const isPos = (v: any) => (v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0)) && v !== 2 && v !== 2.0;
-                            const isIss = (v: any) => v === 2 || v === 2.0 || String(v).toLowerCase().includes('issue');
                             let stat = '❌';
-                            if (isPos(props[k])) stat = '✅';
-                            else if (isIss(props[k])) stat = '⚠️';
+                            if (isPos(props[k], k)) stat = '✅';
+                            else if (isIssue(props[k], k)) stat = '⚠️';
                             popup += `<div class="flex justify-between py-0.5"><span>${k.replace(/_/g, ' ')}</span><span>${stat}</span></div>`;
                         });
                         popup += `</div>`;
