@@ -147,15 +147,23 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         }
 
         // Min/Max for Gradient
-        const dataToScan = (geojson?.features as any[]) || apiResult?.table || [];
         const targetMetric = gMetric || activeMetric;
+        // Scan query data first, then fall back to basemap features for min/max
+        const dataSources = [
+            (geojson?.features as any[]),
+            apiResult?.table,
+            (basemap?.features as any[])
+        ];
         if (targetMetric) {
-            for (const item of dataToScan) {
-                const props = item.properties || item;
-                const val = parseFloat(props[targetMetric]);
-                if (!isNaN(val)) {
-                    min = Math.min(min, val);
-                    max = Math.max(max, val);
+            for (const source of dataSources) {
+                if (!source) continue;
+                for (const item of source) {
+                    const props = item.properties || item;
+                    const val = parseFloat(props[targetMetric]);
+                    if (!isNaN(val)) {
+                        min = Math.min(min, val);
+                        max = Math.max(max, val);
+                    }
                 }
             }
         }
@@ -173,7 +181,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             metricMax: max === -Infinity ? 100 : max,
             queryMode: finalMode
         };
-    }, [geojson, activeMetric, apiResult]);
+    }, [geojson, basemap, activeMetric, apiResult]);
 
     useEffect(() => {
         if (initialFilterIntent) setFilterMode(initialFilterIntent);
@@ -339,14 +347,15 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             }
         }).addTo(map);
 
-        // 3. GEOJSON LAYER (Dots)
+        // 3. GEOJSON LAYER (Dots) — ONLY show point markers in 'school' level
         if (geojsonLayerRef.current) {
             map.removeLayer(geojsonLayerRef.current);
             geojsonLayerRef.current = null;
         }
 
         const isHeatmapMode = String(viewMode) === 'heatmap';
-        if (geojson && !isHeatmapMode) {
+        const showPoints = currentLevel === 'school';
+        if (geojson && !isHeatmapMode && showPoints) {
             geojsonLayerRef.current = L.geoJSON(geojson, {
                 pane: 'schools',
                     filter: (feature) => {
