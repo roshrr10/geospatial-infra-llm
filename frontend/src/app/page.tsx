@@ -104,7 +104,9 @@ export default function Dashboard() {
   }, [mapLevel]);
 
   const loadBasemap = useCallback((level: string) => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/basemap?level=${level}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/basemap?level=${level}`, {
+      headers: { "ngrok-skip-browser-warning": "true" }
+    })
       .then(res => res.json())
       .then(data => setBasemapData(data))
       .catch(err => console.error("Basemap fetch failed", err));
@@ -112,7 +114,9 @@ export default function Dashboard() {
 
   const fetchHeatmap = useCallback(async (metric: string, level: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap?metric=${metric}&level=${level}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap?metric=${metric}&level=${level}`, {
+        headers: { "ngrok-skip-browser-warning": "true" }
+      });
       const data = await response.json();
       if (data.features) {
         const points = data.features.map((f: any) => [
@@ -135,7 +139,9 @@ export default function Dashboard() {
         table: prev?.table || []
       }));
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap/summary?metric=${metric}&level=${level}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap/summary?metric=${metric}&level=${level}`, {
+        headers: { "ngrok-skip-browser-warning": "true" }
+      });
       const data = await response.json();
       if (data.summary) {
         setApiResult((prev: any) => ({
@@ -170,7 +176,10 @@ export default function Dashboard() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/query`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ question: q }),
       });
       if (!response.ok) throw new Error("Failed to fetch from backend");
@@ -267,7 +276,10 @@ export default function Dashboard() {
 
       fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/query/summary`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({ question: q, data: data.table }),
       }).then(res => res.json()).then(summaryData => {
         setApiResult((prev: any) => prev ? { ...prev, summary: summaryData.summary } : null);
@@ -343,7 +355,9 @@ export default function Dashboard() {
     setIsSearching(true);
     try {
       const nextLevel = level === "district" ? "block" : "school";
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/drilldown/${level}/${name}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/drilldown/${level}/${name}`, {
+        headers: { "ngrok-skip-browser-warning": "true" }
+      });
       const geojson = await response.json();
       
       if (apiResult) setHistory((h: any) => [...h, apiResult]);
@@ -392,7 +406,10 @@ export default function Dashboard() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/report`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({
           metric: activeMetric,
           level: mapLevel,
@@ -417,7 +434,10 @@ export default function Dashboard() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/send-email`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
         body: JSON.stringify({
           email,
           report_data: {
@@ -669,7 +689,43 @@ export default function Dashboard() {
         <section className="flex-1 relative flex flex-col h-full bg-slate-50">
           {viewTab === "map" ? (
             <>
-              <LayerControl activeMetric={activeMetric} onMetricChange={setActiveMetric} viewMode={viewMode} onModeChange={setViewMode} adminLevel={mapLevel as any} onLevelChange={setMapLevel} dynamicOptions={dynamicMetrics} />
+              <LayerControl 
+                activeMetric={activeMetric} 
+                onMetricChange={(metric) => {
+                  setActiveMetric(metric);
+                  const metItem = [
+                    { id: "priority_score", label: "Priority Score" },
+                    { id: "electricity", label: "Electricity Availability" },
+                    { id: "drinking_water", label: "Drinking Water" },
+                    { id: "computers", label: "Computer Facilities" },
+                    { id: "ramp", label: "Ramp Accessibility" },
+                    { id: "avg_road_density", label: "Road Density" },
+                    { id: "total_schools", label: "Total Schools" },
+                  ].find(m => m.id === metric);
+                  if (metItem) {
+                    processSearch(`Show ${metItem.label.toLowerCase()} for all ${mapLevel}s`);
+                  }
+                }} 
+                viewMode={viewMode} 
+                onModeChange={setViewMode} 
+                adminLevel={mapLevel as any} 
+                onLevelChange={(level) => {
+                  setMapLevel(level);
+                  const metItem = [
+                    { id: "priority_score", label: "Priority Score" },
+                    { id: "electricity", label: "Electricity Availability" },
+                    { id: "drinking_water", label: "Drinking Water" },
+                    { id: "computers", label: "Computer Facilities" },
+                    { id: "ramp", label: "Ramp Accessibility" },
+                    { id: "avg_road_density", label: "Road Density" },
+                    { id: "total_schools", label: "Total Schools" },
+                  ].find(m => m.id === activeMetric);
+                  if (metItem) {
+                    processSearch(`Show ${metItem.label.toLowerCase()} for all ${level}s`);
+                  }
+                }} 
+                dynamicOptions={dynamicMetrics} 
+              />
               <GeoMap 
                 geojson={apiResult?.geojson} 
                 basemap={basemapData} 

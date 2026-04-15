@@ -47,6 +47,43 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     const mMaxRef = useRef(100);
     const activeMetricRef = useRef(activeMetric);
     const viewModeRef = useRef(viewMode);
+    const regionCountsRef = useRef<Record<string, number>>({});
+    
+    // Extracted filter logic so it can be used for aggregating region clusters dynamically
+    const checkFeatureFilter = (feature: any, currentFilterMode: string, currentQueryMode: string, currentRelevantCols: string[], currActiveMetric?: string) => {
+        if (currentFilterMode === 'all') return true;
+        const props = feature?.properties || {};
+        const isPos = (v: any, key?: string) => {
+            const val = Number(v);
+            if (key?.toLowerCase().includes('computer')) return val > 0;
+            return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
+        };
+        const isNeg = (v: any, key?: string) => {
+            const val = Number(v);
+            if (key?.toLowerCase().includes('computer')) return val === 0 || v === null;
+            return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
+        };
+        const isIssue = (v: any, key?: string) => {
+            const val = Number(v);
+            if (key?.toLowerCase().includes('computer')) return false;
+            return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
+        };
+
+        if (currentQueryMode === 'multi_binary') {
+            const score = currentRelevantCols.filter(k => isPos(props[k], k)).length;
+            const issues = currentRelevantCols.filter(k => isIssue(props[k], k)).length;
+            if (currentFilterMode === 'yes') return score === currentRelevantCols.length;
+            if (currentFilterMode === 'no') return score === 0 && issues === 0;
+            if (currentFilterMode === 'issue') return issues > 0 || (score > 0 && score < currentRelevantCols.length);
+        } else {
+            const col = currActiveMetric || currentRelevantCols[0];
+            if (!col) return true;
+            if (currentFilterMode === 'yes') return isPos(props[col], col);
+            if (currentFilterMode === 'no') return isNeg(props[col], col);
+            if (currentFilterMode === 'issue') return isIssue(props[col], col);
+        }
+        return true;
+    };
     
     useEffect(() => { 
         apiResultRef.current = apiResult; 
@@ -111,10 +148,11 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 
         // Min/Max for Gradient
         const dataToScan = (geojson?.features as any[]) || apiResult?.table || [];
-        if (gMetric) {
+        const targetMetric = gMetric || activeMetric;
+        if (targetMetric) {
             for (const item of dataToScan) {
                 const props = item.properties || item;
-                const val = parseFloat(props[gMetric!]);
+                const val = parseFloat(props[targetMetric]);
                 if (!isNaN(val)) {
                     min = Math.min(min, val);
                     max = Math.max(max, val);
@@ -141,6 +179,29 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         if (initialFilterIntent) setFilterMode(initialFilterIntent);
         else setFilterMode('all');
     }, [geojson, initialFilterIntent]);
+
+    // Calculate dynamic region densities (for shading blocks/districts behind school points)
+    const regionCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        if (!geojson?.features) return counts;
+        
+        let maxCount = 0;
+        geojson.features.forEach((feature: any) => {
+            if (checkFeatureFilter(feature, filterMode, queryMode, relevantInfraCols, activeMetric)) {
+                const props = feature.properties || {};
+                const bName = normalizeName(props.block_name);
+                const dName = normalizeName(props.district_name);
+                if (bName) { counts[bName] = (counts[bName] || 0) + 1; maxCount = Math.max(maxCount, counts[bName]); }
+                if (dName) { counts[dName] = (counts[dName] || 0) + 1; maxCount = Math.max(maxCount, counts[dName]); }
+            }
+        });
+        counts['_max'] = maxCount === 0 ? 1 : maxCount; // prevent div by zero
+        return counts;
+    }, [geojson, filterMode, queryMode, relevantInfraCols, activeMetric]);
+
+    useEffect(() => {
+        regionCountsRef.current = regionCounts;
+    }, [regionCounts]);
 
     useEffect(() => {
         fixIcon();
@@ -181,11 +242,23 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                 return { fillOpacity: 0, weight: 0, opacity: 0, color: 'transparent', interactive: false };
             }
 
-            const defaultStyle = { color: "#64748b", weight: 1.5, fillOpacity: 0.15, fillColor: "#e2e8f0", interactive: true };
+            const defaultStyle = { color: "#3b82f6", weight: 1.5, fillOpacity: 0.1, fillColor: "#bae6fd", interactive: true };
             const nName = normalizeName(feature.properties?.block_name || feature.properties?.district_name || feature.properties?.NAME || feature.properties?.name);
 
-            const currentTable = apiResultRef.current?.table;
+            const rCount = regionCountsRef.current?.[nName];
+            const maxRCount = regionCountsRef.current?.['_max'] || 1;
             const currentGMetric = gMetricRef.current;
+            
+            // DYNAMIC AGGREGATION CHOROPLETH: Shade block/district by density of matched schools over it 
+            if (rCount !== undefined && rCount > 0 && (!currentGMetric && viewModeRef.current !== 'heatmap')) {
+                const ratio = rCount / maxRCount;
+                const r = Math.round(240 - ratio * 220); // 240 -> 20
+                const g = Math.round(249 - ratio * 150); // 249 -> 99
+                const b = Math.round(255 - ratio * 100); // 255 -> 155
+                return { color: "white", weight: 2, fillOpacity: 0.85, fillColor: `rgb(${r},${g},${b})`, interactive: true };
+            }
+
+            const currentTable = apiResultRef.current?.table;
             const currentMin = mMinRef.current;
             const currentMax = mMaxRef.current;
 
@@ -198,8 +271,9 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     });
                 });
 
-                if (record && currentGMetric) {
-                    const val = parseFloat(record[currentGMetric]);
+                if (record && (currentGMetric || activeMetricRef.current)) {
+                    const metricToUse = currentGMetric || activeMetricRef.current;
+                    const val = parseFloat(record[metricToUse as string]);
                     if (!isNaN(val)) {
                         const range = currentMax - currentMin;
                         const ratio = range > 0 ? Math.min(1, Math.max(0, (val - currentMin) / range)) : (val > 0 ? 1 : 0);
@@ -265,38 +339,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             geojsonLayerRef.current = L.geoJSON(geojson, {
                 pane: 'schools',
                     filter: (feature) => {
-                        if (filterMode === 'all') return true;
-                        const props = feature.properties || {};
-                        const isPos = (v: any, key?: string) => {
-                            const val = Number(v);
-                            if (key?.toLowerCase().includes('computer')) return val > 0;
-                            return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
-                        };
-                        const isNeg = (v: any, key?: string) => {
-                            const val = Number(v);
-                            if (key?.toLowerCase().includes('computer')) return val === 0 || v === null;
-                            return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
-                        };
-                        const isIssue = (v: any, key?: string) => {
-                            const val = Number(v);
-                            if (key?.toLowerCase().includes('computer')) return false; // No partial computers defined
-                            return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
-                        };
-
-                        if (queryMode === 'multi_binary') {
-                            const score = relevantInfraCols.filter(k => isPos(props[k], k)).length;
-                            const issues = relevantInfraCols.filter(k => isIssue(props[k], k)).length;
-                            if (filterMode === 'yes') return score === relevantInfraCols.length;
-                            if (filterMode === 'no') return score === 0 && issues === 0;
-                            if (filterMode === 'issue') return issues > 0 || (score > 0 && score < relevantInfraCols.length);
-                        } else {
-                            const col = activeMetric || relevantInfraCols[0];
-                            if (!col) return true;
-                            if (filterMode === 'yes') return isPos(props[col], col);
-                            if (filterMode === 'no') return isNeg(props[col], col);
-                            if (filterMode === 'issue') return isIssue(props[col], col);
-                        }
-                        return true;
+                        return checkFeatureFilter(feature, filterMode, queryMode, relevantInfraCols, activeMetric);
                     },
                     style: (feature) => {
                         const props = feature?.properties || {};
@@ -476,7 +519,9 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 function StateBorder({ map }: { map: L.Map | null }) {
     useEffect(() => {
         if (!map) return;
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/basemap?level=state`)
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/basemap?level=state`, {
+            headers: { "ngrok-skip-browser-warning": "true" }
+        })
             .then(res => res.json())
             .then(data => L.geoJSON(data, { style: { color: "#1e293b", weight: 3, fillOpacity: 0, interactive: false } }).addTo(map))
             .catch(err => console.error("State border load error", err));
