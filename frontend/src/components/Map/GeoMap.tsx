@@ -49,25 +49,27 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     const viewModeRef = useRef(viewMode);
     const regionCountsRef = useRef<Record<string, number>>({});
     
+    // Core boolean logic for infrastructure status
+    const isPos = (v: any, key?: string) => {
+        const val = Number(v);
+        if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val > 0;
+        return val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available';
+    };
+    const isNeg = (v: any, key?: string) => {
+        const val = Number(v);
+        if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val === 0 || v === null;
+        return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
+    };
+    const isIssue = (v: any, key?: string) => {
+        const val = Number(v);
+        return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial') || String(v).toLowerCase().includes('broken');
+    };
+
     // Extracted filter logic so it can be used for aggregating region clusters dynamically
     const checkFeatureFilter = (feature: any, currentFilterMode: string, currentQueryMode: string, currentRelevantCols: string[], currActiveMetric?: string) => {
         if (currentFilterMode === 'all') return true;
         const props = feature?.properties || {};
-        const isPos = (v: any, key?: string) => {
-            const val = Number(v);
-            if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val > 0;
-            return val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available';
-        };
-        const isNeg = (v: any, key?: string) => {
-            const val = Number(v);
-            if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val === 0 || v === null;
-            return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
-        };
-        const isIssue = (v: any, key?: string) => {
-            const val = Number(v);
-            return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial') || String(v).toLowerCase().includes('broken');
-        };
-
+        
         if (currentQueryMode === 'multi_binary') {
             const score = currentRelevantCols.filter(k => isPos(props[k], k)).length;
             const issues = currentRelevantCols.filter(k => isIssue(props[k], k)).length;
