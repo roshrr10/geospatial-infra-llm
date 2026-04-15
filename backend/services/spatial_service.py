@@ -461,7 +461,7 @@ def get_drilldown_data(level: str, name: str):
 
 def get_basemap(level: str = "district"):
     """Returns Meghalaya boundaries for a given admin level. Cached."""
-    cache_key = f"basemap_{level}"
+    cache_key = f"basemap_full_{level}"
     cached = basemap_cache.get(cache_key)
     if cached:
         logger.info("BASEMAP CACHE HIT | level=%s", level)
@@ -471,13 +471,13 @@ def get_basemap(level: str = "district"):
     if level == "state":
         sql = "SELECT ST_Union(geometry) as geometry FROM meghalaya_district_intelligence_final;"
     elif level == "district":
-        sql = "SELECT district_name, geometry FROM meghalaya_district_intelligence_final;"
+        sql = "SELECT * FROM meghalaya_district_intelligence_final;"
     elif level == "block":
-        sql = "SELECT block_name, district_name, geometry FROM meghalaya_block_intelligence_final;"
+        sql = "SELECT * FROM meghalaya_block_intelligence_final;"
     elif level == "school":
         sql = 'SELECT "schoolName", block_name, district_name, geometry FROM meghalaya_schools;'
     else:
-        sql = "SELECT district_name, geometry FROM meghalaya_district_intelligence_final;"
+        sql = "SELECT * FROM meghalaya_district_intelligence_final;"
 
     t0 = time.time()
     gdf = gpd.read_postgis(sql, engine, geom_col="geometry")
@@ -668,3 +668,4 @@ def get_heatmap_data(metric: str, level: str):
     except Exception as e:
         logger.error("HEATMAP FAIL | metric=%s | err=%s", metric, str(e))
         return {"type": "FeatureCollection", "features": []}
+# Cache invalidate pulse 03/28/2026 16:45:40

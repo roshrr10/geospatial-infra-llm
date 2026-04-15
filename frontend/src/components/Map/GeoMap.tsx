@@ -261,31 +261,42 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             const currentTable = apiResultRef.current?.table;
             const currentMin = mMinRef.current;
             const currentMax = mMaxRef.current;
+            const targetMetric = currentGMetric || activeMetricRef.current;
+
+            let val: number | undefined;
 
             if (currentTable && nName) {
                 // Find matching record aggressively
                 const record = currentTable.find((r: any) => {
-                    return Object.values(r).some(val => {
-                        const sVal = normalizeName(String(val));
+                    return Object.values(r).some(v => {
+                        const sVal = normalizeName(String(v));
                         return sVal === nName || sVal.includes(nName) || nName.includes(sVal);
                     });
                 });
 
-                if (record && (currentGMetric || activeMetricRef.current)) {
-                    const metricToUse = currentGMetric || activeMetricRef.current;
-                    const val = parseFloat(record[metricToUse as string]);
-                    if (!isNaN(val)) {
-                        const range = currentMax - currentMin;
-                        const ratio = range > 0 ? Math.min(1, Math.max(0, (val - currentMin) / range)) : (val > 0 ? 1 : 0);
-                        
-                        // Ultra-Vibrant High Contrast Palette
-                        const r = Math.round(180 - ratio * 160); // 180 -> 20
-                        const g = Math.round(200 - ratio * 150); // 200 -> 50
-                        const b = Math.round(255 - ratio * 100); // 255 -> 155
-                        return { color: "white", weight: 2, fillOpacity: 0.95, fillColor: `rgb(${r},${g},${b})`, interactive: true };
-                    }
+                if (record && targetMetric) {
+                    val = parseFloat(record[targetMetric as string]);
                 }
             }
+            
+            // If the record wasn't found in an active query table, look for the data native to the GeoJSON basemap!
+            if (val === undefined || isNaN(val)) {
+                if (targetMetric && feature.properties?.[targetMetric as string] !== undefined) {
+                    val = parseFloat(feature.properties[targetMetric as string]);
+                }
+            }
+
+            if (val !== undefined && !isNaN(val)) {
+                const range = currentMax - currentMin;
+                const ratio = range > 0 ? Math.min(1, Math.max(0, (val - currentMin) / range)) : (val > 0 ? 1 : 0);
+                
+                // Ultra-Vibrant High Contrast Palette
+                const r = Math.round(180 - ratio * 160); // 180 -> 20
+                const g = Math.round(200 - ratio * 150); // 200 -> 50
+                const b = Math.round(255 - ratio * 100); // 255 -> 155
+                return { color: "white", weight: 2, fillOpacity: 0.95, fillColor: `rgb(${r},${g},${b})`, interactive: true };
+            }
+
             return defaultStyle;
         };
 

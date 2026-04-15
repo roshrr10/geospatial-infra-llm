@@ -691,37 +691,15 @@ export default function Dashboard() {
             <>
               <LayerControl 
                 activeMetric={activeMetric} 
-                onMetricChange={(metric) => {
-                  setActiveMetric(metric);
-                  const metItem = [
-                    { id: "priority_score", label: "Priority Score" },
-                    { id: "electricity", label: "Electricity Availability" },
-                    { id: "drinking_water", label: "Drinking Water" },
-                    { id: "computers", label: "Computer Facilities" },
-                    { id: "ramp", label: "Ramp Accessibility" },
-                    { id: "avg_road_density", label: "Road Density" },
-                    { id: "total_schools", label: "Total Schools" },
-                  ].find(m => m.id === metric);
-                  if (metItem) {
-                    processSearch(`Show ${metItem.label.toLowerCase()} for all ${mapLevel}s`);
-                  }
-                }} 
+                onMetricChange={setActiveMetric} 
                 viewMode={viewMode} 
                 onModeChange={setViewMode} 
                 adminLevel={mapLevel as any} 
                 onLevelChange={(level) => {
                   setMapLevel(level);
-                  const metItem = [
-                    { id: "priority_score", label: "Priority Score" },
-                    { id: "electricity", label: "Electricity Availability" },
-                    { id: "drinking_water", label: "Drinking Water" },
-                    { id: "computers", label: "Computer Facilities" },
-                    { id: "ramp", label: "Ramp Accessibility" },
-                    { id: "avg_road_density", label: "Road Density" },
-                    { id: "total_schools", label: "Total Schools" },
-                  ].find(m => m.id === activeMetric);
-                  if (metItem) {
-                    processSearch(`Show ${metItem.label.toLowerCase()} for all ${level}s`);
+                  if (level !== 'school') {
+                    // Wipe any point geojson data from a previous search so it doesn't block the aggregate district view!
+                    setApiResult((prev: any) => prev ? { ...prev, geojson: null } : null);
                   }
                 }} 
                 dynamicOptions={dynamicMetrics} 
