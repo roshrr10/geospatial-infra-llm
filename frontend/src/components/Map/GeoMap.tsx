@@ -67,7 +67,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 
     // Extracted filter logic so it can be used for aggregating region clusters dynamically
     const checkFeatureFilter = (feature: any, currentFilterMode: string, currentQueryMode: string, currentRelevantCols: string[], currActiveMetric?: string) => {
-        if (currentFilterMode === 'all') return true;
+        if (!currentFilterMode || currentFilterMode === 'all') return true;
         const props = feature?.properties || {};
         
         if (currentQueryMode === 'multi_binary') {
@@ -78,12 +78,12 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             if (currentFilterMode === 'issue') return issues > 0 || (score > 0 && score < currentRelevantCols.length);
         } else {
             const col = currActiveMetric || currentRelevantCols[0];
-            if (!col) return true;
+            if (!col) return false; // Strict: If no metric col identified, hide if filter is active
             if (currentFilterMode === 'yes') return isPos(props[col], col);
             if (currentFilterMode === 'no') return isNeg(props[col], col);
             if (currentFilterMode === 'issue') return isIssue(props[col], col);
         }
-        return true;
+        return false; // Strict: Default to false if we have an active filter but hit no case
     };
     
     useEffect(() => { 
