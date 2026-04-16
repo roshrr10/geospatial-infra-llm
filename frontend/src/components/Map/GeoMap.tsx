@@ -52,17 +52,21 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     // Core boolean logic for infrastructure status
     const isPos = (v: any, key?: string) => {
         const val = Number(v);
+        // Special case for 'no_of_computer' count vs existence
         if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val > 0;
-        return val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available';
+        return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
     };
+    
     const isNeg = (v: any, key?: string) => {
         const val = Number(v);
         if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val === 0 || v === null;
         return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
     };
+    
     const isIssue = (v: any, key?: string) => {
         const val = Number(v);
-        return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial') || String(v).toLowerCase().includes('broken');
+        if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return false;
+        return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
     };
 
     // Extracted filter logic so it can be used for aggregating region clusters dynamically
@@ -78,12 +82,12 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             if (currentFilterMode === 'issue') return issues > 0 || (score > 0 && score < currentRelevantCols.length);
         } else {
             const col = currActiveMetric || currentRelevantCols[0];
-            if (!col) return false; // Strict: If no metric col identified, hide if filter is active
+            if (!col) return false; // Strict: Hide when filter active but no col found
             if (currentFilterMode === 'yes') return isPos(props[col], col);
             if (currentFilterMode === 'no') return isNeg(props[col], col);
             if (currentFilterMode === 'issue') return isIssue(props[col], col);
         }
-        return false; // Strict: Default to false if we have an active filter but hit no case
+        return false;
     };
     
     useEffect(() => { 
