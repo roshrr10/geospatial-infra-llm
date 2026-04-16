@@ -49,18 +49,17 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     const viewModeRef = useRef(viewMode);
     const regionCountsRef = useRef<Record<string, number>>({});
     
-    // Core boolean logic for infrastructure status
+    // ── FIXED STATUS HELPERS (CZ3Y1UY8X Logic Restored) ──
     const isPos = (v: any, key?: string) => {
         const val = Number(v);
-        // Special case for 'no_of_computer' count vs existence
         if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val > 0;
-        return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
+        return (val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available') && val !== 2;
     };
     
     const isNeg = (v: any, key?: string) => {
         const val = Number(v);
         if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val === 0 || v === null;
-        return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
+        return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no' || String(v).toLowerCase().trim() === 'unavailable';
     };
     
     const isIssue = (v: any, key?: string) => {
@@ -69,7 +68,6 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
     };
 
-    // Extracted filter logic so it can be used for aggregating region clusters dynamically
     const checkFeatureFilter = (feature: any, currentFilterMode: string, currentQueryMode: string, currentRelevantCols: string[], currActiveMetric?: string) => {
         if (!currentFilterMode || currentFilterMode === 'all') return true;
         const props = feature?.properties || {};
@@ -82,7 +80,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             if (currentFilterMode === 'issue') return issues > 0 || (score > 0 && score < currentRelevantCols.length);
         } else {
             const col = currActiveMetric || currentRelevantCols[0];
-            if (!col) return false; // Strict: Hide when filter active but no col found
+            if (!col) return false; 
             if (currentFilterMode === 'yes') return isPos(props[col], col);
             if (currentFilterMode === 'no') return isNeg(props[col], col);
             if (currentFilterMode === 'issue') return isIssue(props[col], col);
@@ -479,12 +477,17 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         <div className="relative h-full w-full">
             <div id="map-container" className="h-full w-full" />
             {(queryMode === 'multi_binary' || queryMode === 'single_binary') && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] glass p-1.5 rounded-2xl flex gap-1 bg-white/90 backdrop-blur-md border border-white/50 shadow-2xl">
-                    {['all', 'yes', 'issue', 'no'].map(m => (
-                        <button key={m} onClick={() => setFilterMode(m as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === m ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}>
-                            {m === 'all' ? 'All' : m === 'yes' ? 'Met' : m === 'issue' ? 'Partial' : 'None'}
-                        </button>
-                    ))}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] glass px-3 py-1.5 rounded-2xl flex flex-col gap-1 bg-white/90 backdrop-blur-md border border-white/50 shadow-2xl">
+                    <div className="flex gap-1 items-center">
+                        {['all', 'yes', 'issue', 'no'].map(m => (
+                            <button key={m} onClick={() => setFilterMode(m as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === m ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}>
+                                {m === 'all' ? 'All' : m === 'yes' ? 'Met' : m === 'issue' ? 'Partial' : 'None'}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest text-center opacity-50">
+                        Map Filter: <span className="text-blue-600">{filterMode.toUpperCase()}</span> | Mode: {queryMode.toUpperCase()}
+                    </div>
                 </div>
             )}
             {/* Choropleth Legend */}

@@ -200,16 +200,16 @@ export default function Dashboard() {
       
       const features = data.geojson?.features || [];
       // Detect user intent to guide the map's filterMode without throwing away table stats
+      // Detect user intent based on keywords
       const queryLower = q.toLowerCase();
       let detectedIntent: 'all' | 'yes' | 'no' | 'issue' = 'all';
-      if (/\b(without|no|lack|missing|need|don't have|dont have|needs|lacking|unavailable|zero|none)\b/.test(queryLower)) {
+      if (/\b(without|no|lack|missing|need|don't have|dont have|needs|lacking|unavailable|zero|none|not having)\b/.test(queryLower)) {
           detectedIntent = 'no';
-      } else if (/\b(issue|problem|broken|functional issue|repair|partial|working condition)\b/.test(queryLower)) {
+      } else if (/\b(issue|problem|broken|functional issue|repair|partial|working condition|defect|maintenance)\b/.test(queryLower)) {
           detectedIntent = 'issue';
-      } else if (/\b(both|all|have|with|equipped|provided|available|functional)\b/.test(queryLower)) {
+      } else if (/\b(both|all|have|with|equipped|provided|available|functional|connected|present)\b/.test(queryLower)) {
           detectedIntent = 'yes';
       }
-      setMapFilterIntent(detectedIntent);
       
       if (data.table && data.table.length > 0) {
         // Collect ALL keys from the first 500 rows to ensure sparse data (like computers) is detected
@@ -278,6 +278,12 @@ export default function Dashboard() {
         
         setDynamicMetrics(finalDynamicMetrics);
         if (initialActive) setActiveMetric(initialActive);
+        
+        // Finalize state and intent binding
+        setMapFilterIntent(detectedIntent);
+      } else {
+        // If chat-like or no table, reset to all
+        setMapFilterIntent('all');
       }
 
       setApiResult(data);
