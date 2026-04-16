@@ -25,8 +25,18 @@ def _round_coords(geojson: dict, precision: int = 5) -> dict:
 
 
 def _strip_nulls(table: list) -> list:
-    """Remove null-valued keys from each row to reduce payload."""
-    return [{k: v for k, v in row.items() if v is not None} for row in table]
+    """Remove null-valued keys from each row to reduce payload. Handles SQLAlchemy Rows."""
+    cleaned = []
+    for row in table:
+        # Handle SQLAlchemy Row or RowMapping (immutabledict)
+        if hasattr(row, '_mapping'):
+            d = dict(row._mapping)
+        elif hasattr(row, 'items'):
+            d = dict(row)
+        else:
+            d = row
+        cleaned.append({k: v for k, v in d.items() if v is not None})
+    return cleaned
 
 
 def _clean_keys(row: dict) -> dict:
@@ -204,6 +214,15 @@ def execute_spatial_query(sql: str, user_query: str = ""):
     sql = re.sub(r'\bs\."?districtName"?\b', 's.district_name', sql, flags=re.IGNORECASE)
     sql = re.sub(r'\bs\.block\b', 's.block_name', sql, flags=re.IGNORECASE)
     sql = re.sub(r'\bs\."?blockName"?\b', 's.block_name', sql, flags=re.IGNORECASE)
+
+    # 1.6.6 INTEL TABLE REDIRECTION: total_schools is only in block table
+    if 'total_schools' in sql.lower() and 'meghalaya_district_intelligence_final' in sql.lower():
+        sql = sql.replace('meghalaya_district_intelligence_final', 'meghalaya_block_intelligence_final')
+        if 'SUM(total_schools)' not in sql.upper() and 'SUM( total_schools )' not in sql.upper():
+            sql = sql.replace('total_schools', 'SUM(total_schools)')
+        if 'GROUP BY district_name' not in sql.upper():
+            sql = sql.replace(';', ' GROUP BY district_name;')
+        logger.warning("AUTO-FIX | Redirected total_schools query from district to block table")
 
     # 1.7 Auto-fix missing geometry
     # Only inject geometry if the query references a table that has geometry

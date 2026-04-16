@@ -33,8 +33,8 @@ If the user asks for ANY infrastructure data or counts (e.g., "schools with...",
   - 1 = Yes/Functional/Available, 0 = No/None/Needs/Unavailable, 2 = Functional Issue/Partial.
   - For `no_of_computer`, use `i.no_of_computer > 0` for "has computers".
 - SPECIAL RULE (Counts/Density/Admin):
-  - If asked for "number of schools" by block, use `total_schools` from `meghalaya_block_intelligence_final`.
-  - If asked for "number of schools" by district, use `SUM(total_schools)` from `meghalaya_block_intelligence_final` GROUP BY `district_name`.
+  - CRITICAL: "number of schools" OR "total schools" are ONLY available in the BLOCK table (`meghalaya_block_intelligence_final`).
+  - If asked for "number of schools" by district, you MUST use `SUM(total_schools)` from `meghalaya_block_intelligence_final` and GROUP BY `district_name`. NEVER use `total_schools` on the district table.
   - If asked for "blocks in [District]", use `SELECT block_name, district_name, total_schools, geometry FROM meghalaya_block_intelligence_final WHERE district_name ILIKE '%[District]%';`
   - If asked for "road density" or "school density", use `avg_road_density` or `avg_school_density` from `meghalaya_district_intelligence_final`.
 - MULTI-METRIC RULE: If multiple items are mentioned (e.g. "both computers and smart classrooms"), include ALL relevant infra columns INDIVIDUALLY in your `SELECT` statement. This ensures the dashboard charts can show each metric.
@@ -106,7 +106,7 @@ async def get_sql_from_llm(question: str):
 
     # Blocks with highest school density
     if ('school density' in q_lower or 'per sqkm' in q_lower or 'sq.km' in q_lower) and 'block' in q_lower:
-        sql = "SELECT block_name, district_name, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final ORDER BY schools_per_sqkm DESC;"
+        sql = "SELECT block_name, district_name, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final ORDER BY schools_per_sqkm DESC; -- cache-v2"
         result = (sql, "block")
         llm_cache.set(question, result)
         return result

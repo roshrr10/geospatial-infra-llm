@@ -304,7 +304,10 @@ export default function Dashboard() {
         setApiResult((prev: any) => prev ? { ...prev, summary: "Analysis summary unavailable." } : null);
       });
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      console.error("Search failed:", err);
+      setError(err.message || "An error occurred with the AI Spatial Engine. Please try a different query.");
+      setApiResult(null); // Clear stale results on error
+      setMapFilterIntent('all');
     } finally {
       setIsSearching(false);
     }
