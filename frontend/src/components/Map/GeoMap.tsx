@@ -365,16 +365,6 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     },
                     style: (feature) => {
                         const props = feature?.properties || {};
-                        const isPos = (v: any, key?: string) => {
-                            const val = Number(v);
-                            if (key?.toLowerCase().includes('computer')) return val > 0;
-                            return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
-                        };
-                        const isIssue = (v: any, key?: string) => {
-                            const val = Number(v);
-                            if (key?.toLowerCase().includes('computer')) return false;
-                            return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
-                        };
                         
                         // Apply Gradient for metrics (Density, Counts)
                         if (queryMode === 'metric' && gradientMetric && props[gradientMetric] !== undefined) {
