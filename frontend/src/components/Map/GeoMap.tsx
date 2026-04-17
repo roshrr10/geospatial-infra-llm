@@ -76,15 +76,15 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         const props = feature?.properties || {};
         
         if (currentQueryMode === 'multi_binary') {
-            const score = currentRelevantCols.filter(k => isPos(props[k], k)).length;
-            const issues = currentRelevantCols.filter(k => isIssue(props[k], k)).length;
-            if (currentFilterMode === 'yes') return score === currentRelevantCols.length;
-            if (currentFilterMode === 'no') return score === 0 && issues === 0;
-            if (currentFilterMode === 'issue') return issues > 0 || (score > 0 && score < currentRelevantCols.length);
+            const p1 = isPos(props[currentRelevantCols[0]], currentRelevantCols[0]);
+            const p2 = isPos(props[currentRelevantCols[1]], currentRelevantCols[1]);
+            
+            if (currentFilterMode === 'yes') return p1 && p2;
+            if (currentFilterMode === 'no') return !p1 && !p2;
             
             // Venn-logic exact filters
-            if (currentFilterMode === 'only_x') return isPos(props[currentRelevantCols[0]], currentRelevantCols[0]) && !isPos(props[currentRelevantCols[1]], currentRelevantCols[1]);
-            if (currentFilterMode === 'only_y') return !isPos(props[currentRelevantCols[0]], currentRelevantCols[0]) && isPos(props[currentRelevantCols[1]], currentRelevantCols[1]);
+            if (currentFilterMode === 'only_x') return p1 && !p2;
+            if (currentFilterMode === 'only_y') return !p1 && p2;
         } else {
             const col = currActiveMetric || currentRelevantCols[0];
             if (!col) return false; 
@@ -476,11 +476,13 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         }
 
                         if (queryMode === 'multi_binary') {
-                            const score = relevantInfraCols.filter(k => isPos(props[k], k)).length;
-                            const issues = relevantInfraCols.filter(k => isIssue(props[k], k)).length;
-                            let fillColor = "#ef4444";
-                            if (score === relevantInfraCols.length) fillColor = "#10b981";
-                            else if (issues > 0 || score > 0) fillColor = "#f59e0b";
+                            const p1 = isPos(props[relevantInfraCols[0]], relevantInfraCols[0]);
+                            const p2 = isPos(props[relevantInfraCols[1]], relevantInfraCols[1]);
+                            
+                            let fillColor = "#ef4444"; // Default: Neither
+                            if (p1 && p2) fillColor = "#10b981"; // Both
+                            else if (p1) fillColor = "#3b82f6";  // Only X
+                            else if (p2) fillColor = "#f59e0b";  // Only Y
                             return { color: '#000', weight: 1.5, opacity: 1, fillColor, fillOpacity: 1, radius: 8 };
                         } else {
                             const col = activeMetric || relevantInfraCols[0];

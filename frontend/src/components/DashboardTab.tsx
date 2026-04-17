@@ -147,12 +147,50 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
             }
         });
 
+        // OVERRIDE core metric counts for multi-mode so summary cards align
+        // (This makes the top cards show "Both" and "Neither")
+        // We do this BEFORE the return so gapAnalysis uses these values
+        // positiveCount = BOTH, negativeCount = NEITHER, issueCount = PARTIAL(OnlyX+OnlyY)
+        const vennPositive = both;
+        const vennNegative = neither;
+        const vennIssue = onlyX + onlyY;
+
         multiStats.push(
             { name: 'Both', value: both, color: '#10b981', label: 'Joint Compliance' },
             { name: s1.split('_')[0].charAt(0).toUpperCase() + s1.split('_')[0].slice(1), value: onlyX, color: '#3b82f6', label: `${s1.split('_')[0]} only` },
             { name: s2.split('_')[0].charAt(0).toUpperCase() + s2.split('_')[0].slice(1), value: onlyY, color: '#f59e0b', label: `${s2.split('_')[0]} only` },
             { name: 'None', value: neither, color: '#ef4444', label: 'No Facility' }
         );
+
+        // Final Gap Analysis and Summary alignment
+        const finalPos = isMultiBinaryMode ? both : positiveCount;
+        const finalNeg = isMultiBinaryMode ? neither : negativeCount;
+        const finalIss = isMultiBinaryMode ? (onlyX + onlyY) : issueCount;
+        const finalCov = total > 0 ? Math.round((finalPos / total) * 100) : 0;
+
+        return {
+            summaryCards: { total, positiveCount: finalPos, negativeCount: finalNeg, issueCount: finalIss, coverageVal: finalCov },
+            barData: isMultiBinaryMode ? multiStats : statusData,
+            pieData: isMultiBinaryMode ? multiStats : statusData,
+            isMultiBinaryMode,
+            multiStats,
+            districtBreakdown,
+            blockBreakdown,
+            gapAnalysis: {
+                totalTarget: total,
+                currentEquipped: finalPos,
+                gapCount: finalNeg + finalIss,
+                coverage: finalCov,
+                worstBlock: gapAnalysis.worstBlock,
+                worstDistrict: gapAnalysis.worstDistrict
+            },
+            scatterData,
+            prioritySchools: data.filter(d => isNeg(d[activeMetric])).slice(0, 6).map(d => ({
+                name: d.schoolName || d.display_name || d.schname || "School",
+                block: d[bKey] || "-",
+                status: "Critical"
+            }))
+        };
     }
 
     return {

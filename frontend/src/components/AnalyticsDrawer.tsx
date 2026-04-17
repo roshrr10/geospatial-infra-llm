@@ -243,7 +243,28 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
 
     // Detect entity type from the data
     const multiBinaryKeys = numericKeys.filter(k => k !== 'All Selected Facilities' && data.slice(0, 100).every(d => checkVal(d[k], 'yes') || checkVal(d[k], 'no') || checkVal(d[k], 'issue') || d[k] == null));
-    const isMultiBinaryMode = multiBinaryKeys.length > 1;
+    const isMultiBinaryMode = multiBinaryKeys.length >= 2;
+    
+    const vennStats = (isMultiBinaryMode && multiBinaryKeys.length === 2) ? (() => {
+        const s1 = multiBinaryKeys[0];
+        const s2 = multiBinaryKeys[1];
+        let both = 0, onlyX = 0, onlyY = 0, neither = 0;
+        
+        data.forEach(d => {
+            const p1 = checkVal(d[s1], 'yes');
+            const p2 = checkVal(d[s2], 'yes');
+            if (p1 && p2) both++;
+            else if (p1) onlyX++;
+            else if (p2) onlyY++;
+            else neither++;
+        });
+        
+        return {
+            s1Name: s1.split('_')[0].charAt(0).toUpperCase() + s1.split('_')[0].slice(1),
+            s2Name: s2.split('_')[0].charAt(0).toUpperCase() + s2.split('_')[0].slice(1),
+            both, onlyX, onlyY, neither
+        };
+    })() : null;
 
     const multiStats = isMultiBinaryMode ? multiBinaryKeys.map(k => ({
         key: k,
@@ -314,20 +335,38 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
                                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Status Breakdown</h3>
                                 </div>
                                 
-                                {isMultiBinaryMode && (
-                                    <div className="mb-4 space-y-3 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
-                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest shadow-sm">All Requirements Met (Both)</p>
-                                        <div className="flex items-center gap-4">
-                                            <p className="text-3xl font-black text-indigo-900">{data.filter(d => checkVal(d['All Selected Facilities'], 'yes')).length}</p>
-                                            <p className="text-xs font-bold text-indigo-500">schools have all selected facilities.</p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 mt-2">
-                                            {multiStats.map((ms, i) => (
-                                                <div key={i} className="p-3 bg-white rounded-xl shadow-sm flex flex-col">
-                                                    <p className="text-[9px] font-black text-slate-500 uppercase truncate">{ms.label}</p>
-                                                    <p className="text-lg font-black text-slate-800">{ms.yes} <span className="text-[10px] text-slate-400 font-bold ml-1">fully equipped</span></p>
+                                {vennStats && (
+                                    <div className="mb-6 space-y-4">
+                                        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 shadow-sm">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <Sparkles size={12} /> Joint Infrastructure Breakdown
+                                                </p>
+                                                <span className="text-[10px] font-black bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full uppercase">Precise Audit</span>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex flex-col items-center text-center">
+                                                    <p className="text-[9px] font-bold text-emerald-600 uppercase mb-1">Both Equipped</p>
+                                                    <p className="text-2xl font-black text-emerald-900">{vennStats.both}</p>
+                                                    <p className="text-[10px] text-emerald-500 font-bold">{Math.round((vennStats.both / data.length) * 100)}% Coverage</p>
                                                 </div>
-                                            ))}
+                                                <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 flex flex-col items-center text-center">
+                                                    <p className="text-[9px] font-bold text-rose-600 uppercase mb-1">None Available</p>
+                                                    <p className="text-2xl font-black text-rose-900">{vennStats.neither}</p>
+                                                    <p className="text-[10px] text-rose-500 font-bold">{Math.round((vennStats.neither / data.length) * 100)}% Total Gap</p>
+                                                </div>
+                                                <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col items-center text-center">
+                                                    <p className="text-[9px] font-bold text-blue-600 uppercase mb-1">{vennStats.s1Name} Only</p>
+                                                    <p className="text-2xl font-black text-blue-900">{vennStats.onlyX}</p>
+                                                    <p className="text-[10px] text-blue-500 font-bold">{Math.round((vennStats.onlyX / data.length) * 100)}% Single</p>
+                                                </div>
+                                                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex flex-col items-center text-center">
+                                                    <p className="text-[9px] font-bold text-amber-600 uppercase mb-1">{vennStats.s2Name} Only</p>
+                                                    <p className="text-2xl font-black text-amber-900">{vennStats.onlyY}</p>
+                                                    <p className="text-[10px] text-amber-500 font-bold">{Math.round((vennStats.onlyY / data.length) * 100)}% Single</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
