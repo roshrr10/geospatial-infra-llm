@@ -155,7 +155,7 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
 
     return {
         summaryCards: { total, positiveCount, negativeCount, issueCount, coverageVal },
-        barData: statusData,
+        barData: isMultiBinaryMode ? multiStats : statusData,
         pieData: isMultiBinaryMode ? multiStats : statusData,
         isMultiBinaryMode,
         multiStats,
@@ -322,9 +322,17 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
                 <div className="flex items-center justify-between mb-8 border-b pb-4">
                     <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Compliance Distribution (Volume)</h3>
                     <div className="flex gap-4">
-                        <LegendItem label="Equipped" color="#10b981" />
-                        <LegendItem label="Missing" color="#ef4444" />
-                        <LegendItem label="Issue" color="#f59e0b" />
+                        {isMultiBinaryMode ? (
+                            multiStats.map((s: any, i: number) => (
+                                <LegendItem key={i} label={s.name} color={s.color} />
+                            ))
+                        ) : (
+                            <>
+                                <LegendItem label="Equipped" color="#10b981" />
+                                <LegendItem label="Missing" color="#ef4444" />
+                                <LegendItem label="Issue" color="#f59e0b" />
+                            </>
+                        )}
                     </div>
                 </div>
                 <div className="h-64">

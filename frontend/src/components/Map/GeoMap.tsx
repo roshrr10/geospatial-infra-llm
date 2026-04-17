@@ -38,8 +38,8 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     const basemapLayerRef = useRef<L.GeoJSON | null>(null);
     const heatLayerRef = useRef<any>(null);
 
-    const [filterMode, setFilterMode] = useState<'all' | 'yes' | 'no' | 'issue'>('all');
-    const [lastIntentProp, setLastIntentProp] = useState<'all' | 'yes' | 'no' | 'issue' | undefined>(initialFilterIntent);
+    const [filterMode, setFilterMode] = useState<'all' | 'yes' | 'no' | 'issue' | 'only_x' | 'only_y'>('all');
+    const [lastIntentProp, setLastIntentProp] = useState<'all' | 'yes' | 'no' | 'issue' | 'only_x' | 'only_y' | undefined>(initialFilterIntent as any);
     const [legendConfig, setLegendConfig] = useState<any>(null);
     
     // Refs for analytical context (solves stale closures in Leaflet events)
@@ -81,6 +81,10 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             if (currentFilterMode === 'yes') return score === currentRelevantCols.length;
             if (currentFilterMode === 'no') return score === 0 && issues === 0;
             if (currentFilterMode === 'issue') return issues > 0 || (score > 0 && score < currentRelevantCols.length);
+            
+            // Venn-logic exact filters
+            if (currentFilterMode === 'only_x') return isPos(props[currentRelevantCols[0]], currentRelevantCols[0]) && !isPos(props[currentRelevantCols[1]], currentRelevantCols[1]);
+            if (currentFilterMode === 'only_y') return !isPos(props[currentRelevantCols[0]], currentRelevantCols[0]) && isPos(props[currentRelevantCols[1]], currentRelevantCols[1]);
         } else {
             const col = currActiveMetric || currentRelevantCols[0];
             if (!col) return false; 
@@ -533,11 +537,20 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             {(queryMode === 'multi_binary' || queryMode === 'single_binary') && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] glass px-3 py-1.5 rounded-2xl flex flex-col gap-1 bg-white/90 backdrop-blur-md border border-white/50 shadow-2xl">
                     <div className="flex gap-1 items-center">
-                        {['all', 'yes', 'issue', 'no'].map(m => (
-                            <button key={m} onClick={() => setFilterMode(m as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === m ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}>
-                                {m === 'all' ? 'All' : m === 'yes' ? 'Met' : m === 'issue' ? 'Partial' : 'None'}
-                            </button>
-                        ))}
+                        {(queryMode === 'multi_binary' ? ['all', 'yes', 'only_x', 'only_y', 'no'] : ['all', 'yes', 'issue', 'no']).map(m => {
+                            let label = 'All';
+                            if (m === 'yes') label = queryMode === 'multi_binary' ? 'Both' : 'Met';
+                            else if (m === 'no') label = 'None';
+                            else if (m === 'issue') label = 'Partial';
+                            else if (m === 'only_x') label = relevantInfraCols[0]?.split('_')[0].charAt(0).toUpperCase() + relevantInfraCols[0]?.split('_')[0].slice(1) || 'Metric 1';
+                            else if (m === 'only_y') label = relevantInfraCols[1]?.split('_')[0].charAt(0).toUpperCase() + relevantInfraCols[1]?.split('_')[0].slice(1) || 'Metric 2';
+                            
+                            return (
+                                <button key={m} onClick={() => setFilterMode(m as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === m ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}>
+                                    {label}
+                                </button>
+                            );
+                        })}
                     </div>
                     <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest text-center opacity-50">
                         Map Filter: <span className="text-blue-600">{filterMode.toUpperCase()}</span> | Mode: {queryMode.toUpperCase()}
