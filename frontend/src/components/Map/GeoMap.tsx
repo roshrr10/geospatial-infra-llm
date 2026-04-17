@@ -141,18 +141,21 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             .concat(geojson?.features?.[0]?.properties ? Object.keys(geojson.features[0].properties) : []);
         const keys = Array.from(new Set(dataKeys));
 
-        const isBinaryCol = (k: string) => bKeys.some(bk => k.toLowerCase().includes(bk)) && !sKeys.has(k.toLowerCase());
+        const isCombinedCol = (k: string) => k.toLowerCase().includes('_attainment') || k.toLowerCase().includes('_status') || k.toLowerCase() === 'status';
+        const isBinaryCol = (k: string) => bKeys.some(bk => k.toLowerCase().includes(bk)) && !sKeys.has(k.toLowerCase()) && !isCombinedCol(k);
+        
         infraCols = keys.filter(isBinaryCol);
+        const combinedStatusDetected = keys.some(isCombinedCol);
 
         const countKeywords = ['total', 'count', 'density', 'num', 'per_sqkm', 'avg_'];
         const isCountCol = (k: string) => countKeywords.some(ck => k.toLowerCase().includes(ck)) && !sKeys.has(k.toLowerCase());
         
         // Metric Selection Logic
-        if (activeMetric && !isBinaryCol(activeMetric) && !sKeys.has(activeMetric.toLowerCase())) {
+        if (activeMetric && !isBinaryCol(activeMetric) && !isCombinedCol(activeMetric) && !sKeys.has(activeMetric.toLowerCase())) {
             gMetric = activeMetric;
         } else if (!activeMetric) {
             for (const key of keys) {
-                if (sKeys.has(key.toLowerCase())) continue;
+                if (sKeys.has(key.toLowerCase()) || isCombinedCol(key)) continue;
                 if (isCountCol(key)) { gMetric = key; break; }
             }
         }
@@ -180,8 +183,8 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         }
 
         if (activeMetric && gMetric === activeMetric) finalMode = 'metric';
+        else if (combinedStatusDetected || infraCols.length > 1) finalMode = 'multi_binary'; 
         else if (activeMetric && isBinaryCol(activeMetric)) finalMode = 'single_binary';
-        else if (infraCols.length > 1) finalMode = 'multi_binary';
         else if (infraCols.length === 1) finalMode = 'single_binary';
         else if (gMetric) finalMode = 'metric';
 
