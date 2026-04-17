@@ -447,10 +447,12 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         const hasData = geojson || (apiResult?.table && apiResult.table.length > 0) || (heatmapData && heatmapData.length > 0);
 
         if (viewMode === 'heatmap') {
-            const label = activeMetric ? getCleanLabel(activeMetric) : "Intensity";
+            const baseLabel = activeMetric ? getCleanLabel(activeMetric) : "Intensity";
+            const isMissing = filterMode === 'no';
+            const finalLabel = isMissing ? `Absence of ${baseLabel}` : baseLabel;
             newLegendConfig = { 
                 type: 'heatmap', 
-                metricLabel: `${label} Concentration`, 
+                metricLabel: `${finalLabel} Concentration`, 
                 min: 0, 
                 max: 1 
             };
