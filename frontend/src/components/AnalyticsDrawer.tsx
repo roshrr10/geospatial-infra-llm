@@ -212,35 +212,6 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
         return false;
     };
 
-    // Detect if the primary metric is binary (0, 1, 2 or Yes/No) 
-    // PREFER status/attainment columns if they exist for Venn logic
-    const primaryKey = keys.find(k => 
-        k.toLowerCase() === 'status' || 
-        k.toLowerCase().includes('_attainment') || 
-        k.toLowerCase().includes('_status')
-    ) || numericKeys[0] || labelKey;
-    const isBinaryField = primaryKey && (
-        primaryKey.toLowerCase().includes('solar') ||
-        primaryKey.toLowerCase().includes('panel') ||
-        primaryKey.toLowerCase().includes('electricity') ||
-        primaryKey.toLowerCase().includes('eletricity') ||
-        primaryKey.toLowerCase().includes('available') ||
-        primaryKey.toLowerCase().includes('connection') ||
-        primaryKey.toLowerCase().includes('facility') ||
-        primaryKey.toLowerCase().includes('provided') ||
-        data.slice(0, 100).every(d => {
-            const val = d[primaryKey];
-            return checkVal(val, 'yes') || checkVal(val, 'no') || checkVal(val, 'issue') || val === null || val === undefined;
-        })
-    );
-
-    const binaryStats = isBinaryField ? {
-        yes: data.filter(d => checkVal(d[primaryKey], 'yes')).length,
-        no: data.filter(d => checkVal(d[primaryKey], 'no')).length,
-        issue: data.filter(d => checkVal(d[primaryKey], 'issue')).length,
-        total: data.length
-    } : null;
-
     // Detect entity type from the data
     const multiBinaryKeys = numericKeys.filter(k => k !== 'All Selected Facilities' && data.slice(0, 100).every(d => checkVal(d[k], 'yes') || checkVal(d[k], 'no') || checkVal(d[k], 'issue') || d[k] == null));
     const getCleanLabel = (k: string) => {
@@ -278,9 +249,38 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
         };
     })() : null;
 
+    // Detect if the primary metric is binary (0, 1, 2 or Yes/No) 
+    // PREFER status/attainment columns if they exist for Venn logic
+    const primaryKey = keys.find(k => 
+        k.toLowerCase() === 'status' || 
+        k.toLowerCase().includes('_attainment') || 
+        k.toLowerCase().includes('_status')
+    ) || numericKeys[0] || labelKey;
+    const isBinaryField = primaryKey && (
+        primaryKey.toLowerCase().includes('solar') ||
+        primaryKey.toLowerCase().includes('panel') ||
+        primaryKey.toLowerCase().includes('electricity') ||
+        primaryKey.toLowerCase().includes('eletricity') ||
+        primaryKey.toLowerCase().includes('available') ||
+        primaryKey.toLowerCase().includes('connection') ||
+        primaryKey.toLowerCase().includes('facility') ||
+        primaryKey.toLowerCase().includes('provided') ||
+        data.slice(0, 100).every(d => {
+            const val = d[primaryKey];
+            return checkVal(val, 'yes') || checkVal(val, 'no') || checkVal(val, 'issue') || val === null || val === undefined;
+        })
+    );
+
+    const binaryStats = isBinaryField ? {
+        yes: vennStats ? vennStats.both : data.filter(d => checkVal(d[primaryKey], 'yes')).length,
+        no: vennStats ? vennStats.neither : data.filter(d => checkVal(d[primaryKey], 'no')).length,
+        issue: vennStats ? (vennStats.onlyX + vennStats.onlyY) : data.filter(d => checkVal(d[primaryKey], 'issue')).length,
+        total: data.length
+    } : null;
+
     const multiStats = isMultiBinaryMode ? multiBinaryKeys.map(k => ({
         key: k,
-        label: k.replace(/_/g, ' '),
+        label: getCleanLabel(k),
         yes: data.filter(d => checkVal(d[k], 'yes')).length
     })) : [];
 
@@ -330,10 +330,10 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
                                 </div>
                                 <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                                     <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1 flex items-center gap-1">
-                                        <Lightbulb size={12} /> Metric
+                                        <Lightbulb size={12} /> {vennStats ? 'Joint Analysis' : 'Infrastructure Metric'}
                                     </p>
                                     <p className="text-lg font-black text-emerald-900 capitalize">
-                                        {primaryKey ? primaryKey.replace(/_/g, ' ') : 'N/A'}
+                                        {vennStats ? `${vennStats.s1Name} & ${vennStats.s2Name}` : getCleanLabel(primaryKey) || 'Overall Status'}
                                     </p>
                                 </div>
                             </div>

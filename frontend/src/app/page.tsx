@@ -620,19 +620,24 @@ export default function Dashboard() {
                       </div>
 
                       {(() => {
-                        const bKeys = [
-                          'electricity', 'drinking_water', 'water', 'library', 'computers', 'computer', 'playground', 
-                          'ramp', 'internet', 'smart_classroom', 'ict_lab', 'boy_toilets', 'toilet',
-                          'girl_toilets', 'solar_panel', 'solar', 'handwash', 'uniforms', 'text_books',
-                          'extinguisher', 'building_status', 'facility', 'available', 'provided'
-                        ];
-                        
+                        const getCleanLabel = (k: string) => {
+                          if (!k) return '';
+                          return k.replace(/no_of_/gi, '')
+                              .replace(/smart_classroom_available_in_school_1_yes_2_no/gi, 'Smart Classroom')
+                              .replace(/_available/gi, '')
+                              .replace(/_provided/gi, '')
+                              .replace(/_/g, ' ')
+                              .trim()
+                              .split(' ')
+                              .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                              .join(' ');
+                        };
+
                         let presentInfra: string[] = [];
                         if (apiResult.table && apiResult.table.length > 0) {
-                          // Scan for infrastructure keywords in column names
                           const allKeysSet = new Set<string>();
                           apiResult.table.slice(0, 500).forEach((row: any) => Object.keys(row).forEach(k => allKeysSet.add(k)));
-                          const bKeys = ["solar", "electricity", "water", "toilet", "computer", "internet", "smart", "ramp", "playground"];
+                          const bKeys = ["solar", "electricity", "water", "toilet", "computer", "internet", "smart", "ramp", "playground", "attainment"];
                           presentInfra = Array.from(allKeysSet).filter(k => {
                             const lower = k.toLowerCase();
                             const skip = ['id', 'geometry', 'name', 'code', 'longitude', 'latitude'];
@@ -644,7 +649,7 @@ export default function Dashboard() {
                         return (
                           <div className="space-y-4">
                             <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl">
-                              <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest block mb-2">Manual Metric Selection</label>
+                              <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest block mb-2">Infrastructure Analysis Context</label>
                               <select 
                                 value={activeMetric}
                                 onChange={(e) => setActiveMetric(e.target.value)}
@@ -652,31 +657,45 @@ export default function Dashboard() {
                               >
                                 <option value="priority_score">Default Priority Score</option>
                                 {presentInfra.map(f => (
-                                  <option key={f} value={f}>{f.replace(/_/g, ' ').toUpperCase()}</option>
+                                  <option key={f} value={f}>{getCleanLabel(f) || f}</option>
                                 ))}
                               </select>
                             </div>
 
                             {presentInfra.length > 0 && (
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 gap-3">
                                 {(() => {
                                   const total = apiResult.table.length;
-                                  const positive = apiResult.table.filter((row: any) => {
-                                    const positives = ['1', '1.0', 'yes', 'true', 'functional', 'satisfactory', 'available', 'provided'];
+                                  const positives = ['1', '1.0', 'yes', 'true', 'functional', 'satisfactory', 'available', 'provided', 'both'];
+                                  const positiveRows = apiResult.table.filter((row: any) => {
                                     const v = row[activeMetric] || row[presentInfra[0]];
                                     if (v === 1 || v === 1.0) return true;
                                     const vStr = String(v).toLowerCase().trim();
                                     return positives.includes(vStr);
-                                  }).length;
+                                  });
+                                  const positive = positiveRows.length;
+                                  const coverage = total > 0 ? Math.round((positive / total) * 100) : 0;
+                                  
                                   return (
                                     <>
-                                      <div className="p-5 bg-emerald-600 rounded-3xl text-white shadow-md">
-                                        <p className="text-[9px] font-black uppercase opacity-70">Filtered Results: Positive</p>
-                                        <h4 className="text-3xl font-black mt-1">{positive}</h4>
+                                      <div className="p-5 bg-emerald-600 rounded-3xl text-white shadow-lg relative overflow-hidden group">
+                                        <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover:scale-110 transition-transform">
+                                            <CheckCircle size={80} />
+                                        </div>
+                                        <p className="text-[9px] font-black uppercase opacity-70 tracking-tighter">Analysis: Positive Coverage</p>
+                                        <div className="flex items-end gap-2">
+                                            <h4 className="text-3xl font-black mt-1">{positive}</h4>
+                                            <p className="text-[10px] font-bold mb-1 opacity-60">Sites Met</p>
+                                        </div>
+                                        <div className="mt-3 w-full h-1 bg-white/20 rounded-full">
+                                            <div className="h-full bg-white rounded-full" style={{ width: `${coverage}%` }}></div>
+                                        </div>
                                       </div>
-                                      <div className="p-5 bg-slate-800 rounded-3xl text-white shadow-md">
-                                        <p className="text-[9px] font-black uppercase opacity-70">Filtered Results: Total Output</p>
-                                        <h4 className="text-3xl font-black mt-1">{total}</h4>
+                                      
+                                      <div className="p-5 bg-slate-800 rounded-3xl text-white shadow-md border border-slate-700">
+                                        <p className="text-[9px] font-black uppercase opacity-50 tracking-tighter">Total Analysis Dataset</p>
+                                        <h4 className="text-3xl font-black mt-1 text-slate-100">{total}</h4>
+                                        <p className="text-[9px] font-bold text-slate-500 mt-1">Cross-referenced spatial records</p>
                                       </div>
                                     </>
                                   );

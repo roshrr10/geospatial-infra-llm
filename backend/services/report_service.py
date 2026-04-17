@@ -107,12 +107,21 @@ def _generate_bar_chart(dist_data: dict) -> io.BytesIO:
     img_buffer.seek(0)
     return img_buffer
 
+def get_clean_label(k: str) -> str:
+    if not k: return ''
+    # Strip common technical prefixes and suffixes
+    clean = k.replace('no_of_', '').replace('available', '').replace('provided', '').replace('_', ' ')
+    # Specific case for ultra-long smart classroom column
+    clean = clean.replace('smart classroom available in school 1 yes 2 no', 'Smart Classroom')
+    return clean.strip().title()
+
 def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.BytesIO:
     """
     Generates a PDF report for the current data selection.
     """
     # Auto-detect better metric if current one is generic or missing
     resolved_metric = _find_best_metric(data, metric)
+    metric_label = get_clean_label(resolved_metric)
     
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
@@ -144,7 +153,7 @@ def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.Byte
     elements.append(Paragraph("Meghalaya GeoAI Intelligence Report", title_style))
     elements.append(Spacer(1, 0.2 * inch))
     elements.append(Paragraph(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
-    elements.append(Paragraph(f"Analysis Metric: {resolved_metric.replace('_', ' ').upper()}", styles['Normal']))
+    elements.append(Paragraph(f"Analysis Metric: {metric_label.upper()}", styles['Normal']))
     elements.append(Spacer(1, 0.5 * inch))
 
     # 2. Executive Summary (AI Insights)
@@ -201,68 +210,57 @@ def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.Byte
     
     if not detected_infra:
         detected_infra = raw_detected_infra
+
     # Detect query type
-    is_multi = len(detected_infra) > 1
+    is_multi = len(detected_infra) == 2 # Specific Venn logic for 2 metrics
     # Check if the resolved metric is a binary one (usually 1/0 or yes/no)
     is_binary = any(d.get(resolved_metric) in [1, 1.0, 0, 0.0, 'yes', 'no', 'Yes', 'No'] for d in data[:5]) if data else False
     
     if (is_multi or is_binary) and data:
         elements.append(Paragraph("Executive Metrics Summary", header_style))
         
-        # Robust counting (numeric 1/0/2 OR string 'Yes'/'No')
-        def check_val(d, target):
-            # Standardized definition matching Dashboard and AI Summary
-            positives = ['1', '1.0', 'yes', 'true', 'functional', 'satisfactory', 'available', 'provided']
-            negatives = ['0', '0.0', 'no', 'false', 'none', 'unavailable', 'missing']
-            
-            # If we're checking multi, we iterate; if single, we use resolved_metric
-            metrics_to_check = detected_infra if is_multi else [resolved_metric]
-            
-            def match(val, t):
-                v_str = str(val).lower().strip()
-                if t == 'yes': return val == 1 or val == 1.0 or v_str in positives
-                if t == 'no': return val == 0 or val == 0.0 or v_str in negatives
-                if t == 'issue': return val == 2 or any(x in v_str for x in ['issue', 'partial', 'repair', 'not functional'])
-                return False
+        # Robust counting
+        def match(val):
+            positives = ['1', '1.0', 'yes', 'true', 'functional', 'satisfactory', 'available', 'provided', 'both']
+            return val == 1 or val == 1.0 or str(val).lower().strip() in positives
 
-            if target == 'yes':
-                return all(match(d.get(m), 'yes') for m in metrics_to_check)
-            if target == 'no':
-                return all(match(d.get(m), 'no') for m in metrics_to_check)
-            if target == 'issue':
-                if is_multi:
-                    # For multi, an 'issue' is any partial compliance
-                    has_any_yes = any(match(d.get(m), 'yes') for m in metrics_to_check)
-                    is_all_yes = all(match(d.get(m), 'yes') for m in metrics_to_check)
-                    return has_any_yes and not is_all_yes
-                return match(d.get(resolved_metric), 'issue')
-            return False
-
-        yes_count = len([d for d in data if check_val(d, 'yes')])
-        no_count = len([d for d in data if check_val(d, 'no')])
-        issue_count = len([d for d in data if check_val(d, 'issue')])
         total = len(data)
-        
+
         if is_multi:
-            label = f"All {len(detected_infra)} Met"
-            neg_label = "None"
-            issue_label = "Partial"
+            # Venn Logic Breakdown
+            m1, m2 = detected_infra[0], detected_infra[1]
+            m1_name, m2_name = get_clean_label(m1), get_clean_label(m2)
+            
+            both, only1, only2, neither = 0, 0, 0, 0
+            for d in data:
+                p1, p2 = match(d.get(m1)), match(d.get(m2))
+                if p1 and p2: both += 1
+                elif p1: only1 += 1
+                elif p2: only2 += 1
+                else: neither += 1
+                
+            summary_text = f"<b>Total Educational Institutions:</b> {total}<br/><br/>" \
+                           f"<b>Both Facilities (Compliance):</b> {both} ({round(both/total*100, 1)}%)<br/>" \
+                           f"<b>Only {m1_name}:</b> {only1} ({round(only1/total*100, 1)}%)<br/>" \
+                           f"<b>Only {m2_name}:</b> {only2} ({round(only2/total*100, 1)}%)<br/>" \
+                           f"<b>None (Total Gap):</b> {neither} ({round(neither/total*100, 1)}%)"
+            
+            # Use Both/Neither for charts
+            yes_count, no_count, issue_count = both, neither, only1 + only2
+            labels = ["Both Met", "None Met", "Partial Compliance"]
         else:
-            label = "Yes/Available"
-            neg_label = "No/Unavailable"
-            issue_label = "Functional Issue"
-        
-        summary_text = f"<b>Total Records:</b> {total}<br/>" \
-                       f"<b>{label}:</b> {yes_count} ({round(yes_count/total*100, 1) if total > 0 else 0}%)<br/>" \
-                       f"<b>{neg_label}:</b> {no_count} ({round(no_count/total*100, 1) if total > 0 else 0}%)<br/>"
-        
-        if is_multi or issue_count > 0:
-            summary_text += f"<b>{issue_label}:</b> {issue_count} ({round(issue_count/total*100, 1) if total > 0 else 0}%)"
+            yes_count = len([d for d in data if match(d.get(resolved_metric))])
+            no_count = total - yes_count
+            issue_count = 0 # Single binary doesn't have 'issue' logic here yet
+            
+            summary_text = f"<b>Total Records:</b> {total}<br/>" \
+                           f"<b>Equipped/Available:</b> {yes_count} ({round(yes_count/total*100, 1)}%)<br/>" \
+                           f"<b>Missing/Unavailable:</b> {no_count} ({round(no_count/total*100, 1)}%)"
+            labels = ["Equipped", "Missing", "Partial"]
             
         elements.append(Paragraph(summary_text, styles['Normal']))
         
         # --- GENERATE AND ADD PIE CHART ---
-        labels = [label, neg_label, issue_label]
         pie_buf = _generate_pie_chart(yes_count, no_count, issue_count, labels)
         if pie_buf:
             elements.append(Image(pie_buf, width=3.5*inch, height=2.6*inch))
