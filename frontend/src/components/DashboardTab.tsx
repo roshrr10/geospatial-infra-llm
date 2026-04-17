@@ -118,7 +118,9 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
         !['id', 'udise_code', 'udise_num', 'geometry'].includes(k) &&
         data.slice(0, 10).every(d => isPos(d[k]) || isNeg(d[k]) || isIss(d[k]) || d[k] == null)
     );
-
+    const isMultiBinaryMode = binaryCols.length === 2;
+    const multiStats: any[] = [];
+    
     if (isMultiBinaryMode) {
         const s1 = binaryCols[0];
         const s2 = binaryCols[1];
