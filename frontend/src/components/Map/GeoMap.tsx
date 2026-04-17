@@ -364,7 +364,48 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             }
         }).addTo(map);
 
-        // 3. GEOJSON LAYER (Dots) — ONLY show point markers in 'school' level
+        // The GEOJSON LAYER (Dots) has been extracted to a separate atomic useEffect below.
+
+        // --- HEATMAP LAYER ---
+        if (viewMode === "heatmap" && heatmapData?.length) {
+            if (heatLayerRef.current) map.removeLayer(heatLayerRef.current);
+            // @ts-ignore
+            heatLayerRef.current = (L as any).heatLayer(heatmapData, { radius: 25, blur: 15, max: 0.8 }).addTo(map);
+        } else if (heatLayerRef.current) {
+            map.removeLayer(heatLayerRef.current);
+            heatLayerRef.current = null;
+        }
+
+        // --- LEGEND AND MODE FINALIZATION ---
+        let newLegendConfig = null;
+        const hasData = geojson || (apiResult?.table && apiResult.table.length > 0);
+
+        if (hasData && queryMode === 'metric' && gradientMetric) {
+            newLegendConfig = { type: 'gradient', metricLabel: gradientMetric.replace(/_/g, ' ').toUpperCase(), min: metricMin, max: metricMax };
+        } else if (hasData && (queryMode === 'multi_binary' || queryMode === 'single_binary')) {
+            const label = queryMode === 'multi_binary' 
+                ? `Criteria: ${relevantInfraCols.map(k => k.replace(/_/g, ' ').replace(/\bno of\b/gi, '')).join(" & ").toUpperCase()}`
+                : (activeMetric || relevantInfraCols[0] || "Infrastructure").replace(/_/g, ' ').toUpperCase();
+
+            newLegendConfig = { 
+                type: 'binary', 
+                metricLabel: label, 
+                items: [
+                    { label: queryMode === 'multi_binary' ? 'All Criteria Met' : 'Met / Available', color: '#10b981' },
+                    { label: queryMode === 'multi_binary' ? 'Partial / Issue' : 'Issue / Partial', color: '#f59e0b' },
+                    { label: queryMode === 'multi_binary' ? 'None Met' : 'Missing / No', color: '#ef4444' }
+                ]
+            };
+        }
+        setLegendConfig(newLegendConfig);
+
+    }, [basemap, currentLevel, heatmapData, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode, geojson]);
+
+    // Isolated hook entirely dedicated to School Point Markers rendering
+    useEffect(() => {
+        if (!mapRef.current) return;
+        const map = mapRef.current;
+
         if (geojsonLayerRef.current) {
             map.removeLayer(geojsonLayerRef.current);
             geojsonLayerRef.current = null;
@@ -373,15 +414,17 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         const isHeatmapMode = String(viewMode) === 'heatmap';
         const showPoints = currentLevel === 'school';
         if (geojson && !isHeatmapMode && showPoints) {
-            geojsonLayerRef.current = L.geoJSON(geojson, {
-                pane: 'schools',
+            // Using a short setTimeout ensures the canvas renderer clears the previous removal completely
+            // before calculating the path bounds for new additions. This defeats Leaflet's render batching race conditionals.
+            const renderHandle = setTimeout(() => {
+                geojsonLayerRef.current = L.geoJSON(geojson, {
+                    pane: 'schools',
                     filter: (feature) => {
                         return checkFeatureFilter(feature, filterMode, queryMode, relevantInfraCols, activeMetric);
                     },
                     style: (feature) => {
                         const props = feature?.properties || {};
                         
-                        // Apply Gradient for metrics (Density, Counts)
                         if (queryMode === 'metric' && gradientMetric && props[gradientMetric] !== undefined) {
                             const val = parseFloat(props[gradientMetric]);
                             if (!isNaN(val)) {
@@ -448,43 +491,10 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         });
                     }
                 }).addTo(map);
-            }
+            }, 10);
+            return () => clearTimeout(renderHandle);
         }
-
-        // --- HEATMAP LAYER ---
-        if (viewMode === "heatmap" && heatmapData?.length) {
-            if (heatLayerRef.current) map.removeLayer(heatLayerRef.current);
-            // @ts-ignore
-            heatLayerRef.current = (L as any).heatLayer(heatmapData, { radius: 25, blur: 15, max: 0.8 }).addTo(map);
-        } else if (heatLayerRef.current) {
-            map.removeLayer(heatLayerRef.current);
-            heatLayerRef.current = null;
-        }
-
-        // --- LEGEND AND MODE FINALIZATION ---
-        let newLegendConfig = null;
-        const hasData = geojson || (apiResult?.table && apiResult.table.length > 0);
-
-        if (hasData && queryMode === 'metric' && gradientMetric) {
-            newLegendConfig = { type: 'gradient', metricLabel: gradientMetric.replace(/_/g, ' ').toUpperCase(), min: metricMin, max: metricMax };
-        } else if (hasData && (queryMode === 'multi_binary' || queryMode === 'single_binary')) {
-            const label = queryMode === 'multi_binary' 
-                ? `Criteria: ${relevantInfraCols.map(k => k.replace(/_/g, ' ').replace(/\bno of\b/gi, '')).join(" & ").toUpperCase()}`
-                : (activeMetric || relevantInfraCols[0] || "Infrastructure").replace(/_/g, ' ').toUpperCase();
-
-            newLegendConfig = { 
-                type: 'binary', 
-                metricLabel: label, 
-                items: [
-                    { label: queryMode === 'multi_binary' ? 'All Criteria Met' : 'Met / Available', color: '#10b981' },
-                    { label: queryMode === 'multi_binary' ? 'Partial / Issue' : 'Issue / Partial', color: '#f59e0b' },
-                    { label: queryMode === 'multi_binary' ? 'None Met' : 'Missing / No', color: '#ef4444' }
-                ]
-            };
-        }
-        setLegendConfig(newLegendConfig);
-
-    }, [geojson, basemap, currentLevel, onFeatureClick, heatmapData, filterMode, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode]);
+    }, [geojson, filterMode, queryMode, relevantInfraCols, activeMetric, viewMode, currentLevel, gradientMetric, metricMin, metricMax, onFeatureClick]);
 
     return (
         <div className="relative h-full w-full">
