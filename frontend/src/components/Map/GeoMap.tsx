@@ -37,8 +37,8 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     const basemapLayerRef = useRef<L.GeoJSON | null>(null);
     const heatLayerRef = useRef<any>(null);
 
-    const prevIntentRef = useRef<'all' | 'yes' | 'no' | 'issue' | undefined>(undefined);
     const [filterMode, setFilterMode] = useState<'all' | 'yes' | 'no' | 'issue'>('all');
+    const [lastIntentProp, setLastIntentProp] = useState<'all' | 'yes' | 'no' | 'issue' | undefined>(initialFilterIntent);
     const [legendConfig, setLegendConfig] = useState<any>(null);
     
     // Refs for analytical context (solves stale closures in Leaflet events)
@@ -188,17 +188,11 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         };
     }, [geojson, basemap, activeMetric, apiResult]);
 
-    // Use intent if it just changed, otherwise respect the state (which allows button clicks to work)
-    const effectiveFilter = (initialFilterIntent !== prevIntentRef.current && initialFilterIntent !== undefined) 
-        ? initialFilterIntent 
-        : filterMode;
-
-    useEffect(() => {
-        if (initialFilterIntent !== prevIntentRef.current) {
-            prevIntentRef.current = initialFilterIntent;
-            setFilterMode(initialFilterIntent || 'all');
-        }
-    }, [initialFilterIntent]);
+    // Synchronously intercept new intents from API so there's no race condition
+    if (initialFilterIntent !== lastIntentProp) {
+        setLastIntentProp(initialFilterIntent);
+        setFilterMode(initialFilterIntent || 'all');
+    }
 
     // Cleanup Leaflet map on unmount so it remounts correctly when switching tabs
     useEffect(() => {
@@ -218,7 +212,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         
         let maxCount = 0;
         geojson.features.forEach((feature: any) => {
-            if (checkFeatureFilter(feature, effectiveFilter, queryMode, relevantInfraCols, activeMetric)) {
+            if (checkFeatureFilter(feature, filterMode, queryMode, relevantInfraCols, activeMetric)) {
                 const props = feature.properties || {};
                 const bName = normalizeName(props.block_name);
                 const dName = normalizeName(props.district_name);
@@ -228,7 +222,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         });
         counts['_max'] = maxCount === 0 ? 1 : maxCount; // prevent div by zero
         return counts;
-    }, [geojson, effectiveFilter, queryMode, relevantInfraCols, activeMetric]);
+    }, [geojson, filterMode, queryMode, relevantInfraCols, activeMetric]);
 
     useEffect(() => {
         regionCountsRef.current = regionCounts;
@@ -382,7 +376,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             geojsonLayerRef.current = L.geoJSON(geojson, {
                 pane: 'schools',
                     filter: (feature) => {
-                        return checkFeatureFilter(feature, effectiveFilter, queryMode, relevantInfraCols, activeMetric);
+                        return checkFeatureFilter(feature, filterMode, queryMode, relevantInfraCols, activeMetric);
                     },
                     style: (feature) => {
                         const props = feature?.properties || {};
@@ -490,7 +484,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         }
         setLegendConfig(newLegendConfig);
 
-    }, [geojson, basemap, currentLevel, onFeatureClick, heatmapData, effectiveFilter, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode]);
+    }, [geojson, basemap, currentLevel, onFeatureClick, heatmapData, filterMode, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode]);
 
     return (
         <div className="relative h-full w-full">
