@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import L from "leaflet";
@@ -49,29 +49,26 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     const viewModeRef = useRef(viewMode);
     const regionCountsRef = useRef<Record<string, number>>({});
     
-    // ── FIXED STATUS HELPERS (CZ3Y1UY8X Logic Restored) ──
-    const isPos = (v: any, key?: string) => {
-        const val = Number(v);
-        if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val > 0;
-        return (val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available') && val !== 2;
-    };
-    
-    const isNeg = (v: any, key?: string) => {
-        const val = Number(v);
-        if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return val === 0 || v === null;
-        return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no' || String(v).toLowerCase().trim() === 'unavailable';
-    };
-    
-    const isIssue = (v: any, key?: string) => {
-        const val = Number(v);
-        if (key?.toLowerCase().includes('computer') && !key?.toLowerCase().includes('available')) return false;
-        return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
-    };
-
+    // Extracted filter logic so it can be used for aggregating region clusters dynamically
     const checkFeatureFilter = (feature: any, currentFilterMode: string, currentQueryMode: string, currentRelevantCols: string[], currActiveMetric?: string) => {
-        if (!currentFilterMode || currentFilterMode === 'all') return true;
+        if (currentFilterMode === 'all') return true;
         const props = feature?.properties || {};
-        
+        const isPos = (v: any, key?: string) => {
+            const val = Number(v);
+            if (key?.toLowerCase().includes('computer')) return val > 0;
+            return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
+        };
+        const isNeg = (v: any, key?: string) => {
+            const val = Number(v);
+            if (key?.toLowerCase().includes('computer')) return val === 0 || v === null;
+            return val === 0 || v === null || v === undefined || String(v).toLowerCase().trim() === 'no';
+        };
+        const isIssue = (v: any, key?: string) => {
+            const val = Number(v);
+            if (key?.toLowerCase().includes('computer')) return false;
+            return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
+        };
+
         if (currentQueryMode === 'multi_binary') {
             const score = currentRelevantCols.filter(k => isPos(props[k], k)).length;
             const issues = currentRelevantCols.filter(k => isIssue(props[k], k)).length;
@@ -80,12 +77,12 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             if (currentFilterMode === 'issue') return issues > 0 || (score > 0 && score < currentRelevantCols.length);
         } else {
             const col = currActiveMetric || currentRelevantCols[0];
-            if (!col) return false; 
+            if (!col) return true;
             if (currentFilterMode === 'yes') return isPos(props[col], col);
             if (currentFilterMode === 'no') return isNeg(props[col], col);
             if (currentFilterMode === 'issue') return isIssue(props[col], col);
         }
-        return false;
+        return true;
     };
     
     useEffect(() => { 
@@ -129,9 +126,8 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         let max = -Infinity;
         let finalMode: 'multi_binary' | 'single_binary' | 'metric' | 'default' = 'default';
 
-        // Prioritize keys from the API query result over the background basemap properties
-        const dataKeys = (apiResult?.table?.[0] ? Object.keys(apiResult.table[0]) : [])
-            .concat(geojson?.features?.[0]?.properties ? Object.keys(geojson.features[0].properties) : []);
+        const dataKeys = (geojson?.features?.[0]?.properties ? Object.keys(geojson.features[0].properties) : [])
+            .concat(apiResult?.table?.[0] ? Object.keys(apiResult.table[0]) : []);
         const keys = Array.from(new Set(dataKeys));
 
         const isBinaryCol = (k: string) => bKeys.some(bk => k.toLowerCase().includes(bk)) && !sKeys.has(k.toLowerCase());
@@ -190,17 +186,16 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     useEffect(() => {
         if (initialFilterIntent) setFilterMode(initialFilterIntent);
         else setFilterMode('all');
-    }, [initialFilterIntent]);
+    }, [geojson, initialFilterIntent]);
 
     // Calculate dynamic region densities (for shading blocks/districts behind school points)
     const regionCounts = useMemo(() => {
         const counts: Record<string, number> = {};
         if (!geojson?.features) return counts;
         
-        const effectiveFilter = initialFilterIntent || filterMode;
         let maxCount = 0;
         geojson.features.forEach((feature: any) => {
-            if (checkFeatureFilter(feature, effectiveFilter, queryMode, relevantInfraCols, activeMetric)) {
+            if (checkFeatureFilter(feature, filterMode, queryMode, relevantInfraCols, activeMetric)) {
                 const props = feature.properties || {};
                 const bName = normalizeName(props.block_name);
                 const dName = normalizeName(props.district_name);
@@ -210,7 +205,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         });
         counts['_max'] = maxCount === 0 ? 1 : maxCount; // prevent div by zero
         return counts;
-    }, [geojson, filterMode, queryMode, relevantInfraCols, activeMetric, initialFilterIntent]);
+    }, [geojson, filterMode, queryMode, relevantInfraCols, activeMetric]);
 
     useEffect(() => {
         regionCountsRef.current = regionCounts;
@@ -352,7 +347,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             }
         }).addTo(map);
 
-        // 3. GEOJSON LAYER (Dots) — ONLY show point markers in 'school' level
+        // 3. GEOJSON LAYER (Dots) ΓÇö ONLY show point markers in 'school' level
         if (geojsonLayerRef.current) {
             map.removeLayer(geojsonLayerRef.current);
             geojsonLayerRef.current = null;
@@ -360,16 +355,24 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 
         const isHeatmapMode = String(viewMode) === 'heatmap';
         const showPoints = currentLevel === 'school';
-        // Use initialFilterIntent directly as the effective filter to avoid async state race
-        const effectiveFilter = initialFilterIntent || filterMode;
         if (geojson && !isHeatmapMode && showPoints) {
             geojsonLayerRef.current = L.geoJSON(geojson, {
                 pane: 'schools',
                     filter: (feature) => {
-                        return checkFeatureFilter(feature, effectiveFilter, queryMode, relevantInfraCols, activeMetric);
+                        return checkFeatureFilter(feature, filterMode, queryMode, relevantInfraCols, activeMetric);
                     },
                     style: (feature) => {
                         const props = feature?.properties || {};
+                        const isPos = (v: any, key?: string) => {
+                            const val = Number(v);
+                            if (key?.toLowerCase().includes('computer')) return val > 0;
+                            return (val === 1 || String(v).toLowerCase().trim() === 'yes') && val !== 2;
+                        };
+                        const isIssue = (v: any, key?: string) => {
+                            const val = Number(v);
+                            if (key?.toLowerCase().includes('computer')) return false;
+                            return val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial');
+                        };
                         
                         // Apply Gradient for metrics (Density, Counts)
                         if (queryMode === 'metric' && gradientMetric && props[gradientMetric] !== undefined) {
@@ -414,9 +417,11 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         let popup = `<div class="p-2 min-w-[150px] font-sans text-xs">`;
                         popup += `<h3 class="font-bold border-b pb-1 mb-1">${name}</h3>`;
                         relevantInfraCols.forEach(k => {
-                            let stat = '❌';
-                            if (isPos(props[k], k)) stat = '✅';
-                            else if (isIssue(props[k], k)) stat = '⚠️';
+                            const isPos = (v: any) => (v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'available', 'provided'].includes(String(v).toLowerCase().trim()) || (typeof v === 'number' && v > 0)) && v !== 2 && v !== 2.0;
+                            const isIss = (v: any) => v === 2 || v === 2.0 || String(v).toLowerCase().includes('issue');
+                            let stat = 'Γ¥î';
+                            if (isPos(props[k])) stat = 'Γ£à';
+                            else if (isIss(props[k])) stat = 'ΓÜá∩╕Å';
                             popup += `<div class="flex justify-between py-0.5"><span>${k.replace(/_/g, ' ')}</span><span>${stat}</span></div>`;
                         });
                         popup += `</div>`;
@@ -474,23 +479,18 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         }
         setLegendConfig(newLegendConfig);
 
-    }, [geojson, basemap, currentLevel, onFeatureClick, heatmapData, filterMode, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode, initialFilterIntent]);
+    }, [geojson, basemap, currentLevel, onFeatureClick, heatmapData, filterMode, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode]);
 
     return (
         <div className="relative h-full w-full">
             <div id="map-container" className="h-full w-full" />
             {(queryMode === 'multi_binary' || queryMode === 'single_binary') && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] glass px-3 py-1.5 rounded-2xl flex flex-col gap-1 bg-white/90 backdrop-blur-md border border-white/50 shadow-2xl">
-                    <div className="flex gap-1 items-center">
-                        {['all', 'yes', 'issue', 'no'].map(m => (
-                            <button key={m} onClick={() => setFilterMode(m as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === m ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}>
-                                {m === 'all' ? 'All' : m === 'yes' ? 'Met' : m === 'issue' ? 'Partial' : 'None'}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest text-center opacity-50">
-                        Map Filter: <span className="text-blue-600">{filterMode.toUpperCase()}</span> | Mode: {queryMode.toUpperCase()}
-                    </div>
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] glass p-1.5 rounded-2xl flex gap-1 bg-white/90 backdrop-blur-md border border-white/50 shadow-2xl">
+                    {['all', 'yes', 'issue', 'no'].map(m => (
+                        <button key={m} onClick={() => setFilterMode(m as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === m ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}>
+                            {m === 'all' ? 'All' : m === 'yes' ? 'Met' : m === 'issue' ? 'Partial' : 'None'}
+                        </button>
+                    ))}
                 </div>
             )}
             {/* Choropleth Legend */}

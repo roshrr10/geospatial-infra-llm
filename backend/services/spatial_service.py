@@ -215,7 +215,15 @@ def execute_spatial_query(sql: str, user_query: str = ""):
     sql = re.sub(r'\bs\.block\b', 's.block_name', sql, flags=re.IGNORECASE)
     sql = re.sub(r'\bs\."?blockName"?\b', 's.block_name', sql, flags=re.IGNORECASE)
 
-    # 1.6.6 INTEL TABLE REDIRECTION: total_schools is only in block table
+    # 1.6.6 AMBIGUITY FIX: When joining schools (s) with intel (d/b), alias the shared name columns
+    if 'JOIN' in sql.upper() and ('MEGHALAYA_DISTRICT_INTELLIGENCE_FINAL' in sql.upper() or 'MEGHALAYA_BLOCK_INTELLIGENCE_FINAL' in sql.upper()):
+        # Replace un-aliased 'district_name' with 's.district_name'
+        # Improved regex to handle cases before commas or at line starts
+        sql = re.sub(r'(?<![.\w])district_name\b', 's.district_name', sql, flags=re.IGNORECASE)
+        sql = re.sub(r'(?<![.\w])block_name\b', 's.block_name', sql, flags=re.IGNORECASE)
+        logger.warning("AUTO-FIX | Resolved ambiguous column references")
+
+    # 1.6.7 INTEL TABLE REDIRECTION: total_schools is only in block table
     if 'total_schools' in sql.lower() and 'meghalaya_district_intelligence_final' in sql.lower():
         sql = sql.replace('meghalaya_district_intelligence_final', 'meghalaya_block_intelligence_final')
         if 'SUM(total_schools)' not in sql.upper() and 'SUM( total_schools )' not in sql.upper():

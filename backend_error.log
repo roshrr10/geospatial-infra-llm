@@ -6378,3 +6378,97 @@ SQL: SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, s.geomet
 FROM meghalaya_schools s
 JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11)
 WHERE i.library_facility = 1 AND s.block_name ILIKE '%RI BHOI%';
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.UndefinedColumn) column "total_schools" does not exist
+LINE 1: SELECT 'Meghalaya' as state_name, SUM(total_schools) as tota...
+                                              ^
+
+[SQL: SELECT 'Meghalaya' as state_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_district_intelligence_final;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT 'Meghalaya' as state_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_district_intelligence_final;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.UndefinedColumn) column "total_schools" does not exist
+LINE 1: SELECT 'Meghalaya' as state_name, SUM(total_schools) as tota...
+                                              ^
+
+[SQL: SELECT 'Meghalaya' as state_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_district_intelligence_final;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT 'Meghalaya' as state_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_district_intelligence_final;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.AmbiguousColumn) column reference "district_name" is ambiguous
+LINE 1: SELECT s.udise_num, s.geometry, district_name, AVG(i.fire_ex...
+                                        ^
+
+[SQL: SELECT s.udise_num, s.geometry, district_name, AVG(i.fire_extinguisher_available_1_yes_2_no) as fire_extinguisher_availability, AVG(i.smart_classroom_available_in_school_1_yes_2_no) as smart_classroom_availability, AVG(i.internet_facility_available_in_school_1_yes_2_no) as internet_availability, AVG(i.no_of_computer > 0) as computer_availability
+FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text
+JOIN meghalaya_district_intelligence_final d ON ST_Within(s.geometry, d.geometry)
+GROUP BY district_name
+ORDER BY fire_extinguisher_availability + smart_classroom_availability + internet_availability + computer_availability DESC;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT district_name, AVG(i.fire_extinguisher_available_1_yes_2_no) as fire_extinguisher_availability, AVG(i.smart_classroom_available_in_school_1_yes_2_no) as smart_classroom_availability, AVG(i.internet_facility_available_in_school_1_yes_2_no) as internet_availability, AVG(i.no_of_computer > 0) as computer_availability
+FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text
+JOIN meghalaya_district_intelligence_final d ON ST_Within(s.geometry, d.geometry)
+GROUP BY district_name
+ORDER BY fire_extinguisher_availability + smart_classroom_availability + internet_availability + computer_availability DESC;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.AmbiguousColumn) column reference "district_name" is ambiguous
+LINE 1: SELECT district_name, AVG(i.fire_extinguisher_available_1_ye...
+               ^
+
+[SQL: SELECT district_name, AVG(i.fire_extinguisher_available_1_yes_2_no) as fire_extinguishers_availability, AVG(i.smart_classroom_available_in_school_1_yes_2_no) as smart_classrooms_availability, AVG(i.internet_facility_available_in_school_1_yes_2_no) as internet_availability, AVG(i.no_of_computer > 0) as computer_availability, geometry 
+FROM meghalaya_schools s
+JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text
+GROUP BY district_name
+ORDER BY fire_extinguishers_availability, smart_classrooms_availability, internet_availability, computer_availability DESC, geometry;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT district_name, AVG(i.fire_extinguisher_available_1_yes_2_no) as fire_extinguishers_availability, AVG(i.smart_classroom_available_in_school_1_yes_2_no) as smart_classrooms_availability, AVG(i.internet_facility_available_in_school_1_yes_2_no) as internet_availability, AVG(i.no_of_computer > 0) as computer_availability
+FROM meghalaya_schools s
+JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text
+GROUP BY district_name
+ORDER BY fire_extinguishers_availability, smart_classrooms_availability, internet_availability, computer_availability DESC;
+
+
+FINAL ERROR AFTER 2 RETRIES:
+(psycopg2.errors.AmbiguousColumn) column reference "district_name" is ambiguous
+LINE 1: SELECT district_name, AVG(i.fire_extinguisher_available_1_ye...
+               ^
+
+[SQL: SELECT district_name, AVG(i.fire_extinguisher_available_1_yes_2_no) as fire_extinguishers_availability, AVG(i.smart_classroom_available_in_school_1_yes_2_no) as smart_classrooms_availability, AVG(i.internet_facility_available_in_school_1_yes_2_no) as internet_availability, AVG(i.no_of_computer > 0) as computer_availability, geometry 
+FROM meghalaya_schools s
+JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text
+GROUP BY district_name
+ORDER BY fire_extinguishers_availability, smart_classrooms_availability, internet_availability, computer_availability DESC, geometry;]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+
+TRACE:
+NoneType: None
+
+SQL: SELECT district_name, AVG(i.fire_extinguisher_available_1_yes_2_no) as fire_extinguishers_availability, AVG(i.smart_classroom_available_in_school_1_yes_2_no) as smart_classrooms_availability, AVG(i.internet_facility_available_in_school_1_yes_2_no) as internet_availability, AVG(i.no_of_computer > 0) as computer_availability
+FROM meghalaya_schools s
+JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text
+GROUP BY district_name
+ORDER BY fire_extinguishers_availability, smart_classrooms_availability, internet_availability, computer_availability DESC;

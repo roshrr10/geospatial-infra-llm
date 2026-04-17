@@ -218,6 +218,83 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
+    # SOLAR PANEL
+    if 'solar' in q_lower or 'panel' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.solar_panel, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # LIBRARY
+    if 'library' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.library_facility, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # PLAYGROUND
+    if 'playground' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.playground_available, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # TOILET
+    if 'toilet' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.boy_toilet_available, i.girls_toilet_available, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # INTERNET (standalone, not combined with smart classroom)
+    if 'internet' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.internet_facility_available_in_school_1_yes_2_no as internet_available, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # FIRE EXTINGUISHER
+    if 'fire' in q_lower or 'extinguisher' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.fire_extinguisher_available_1_yes_2_no as fire_extinguisher, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # HAND WASHING
+    if 'handwash' in q_lower or 'hand wash' in q_lower:
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.hand_washing_facility_near_toilet, s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
     # RAMPS (Specific Sidebar Fix)
     if 'ramp' in q_lower:
         sql = """-- NO_STRIP

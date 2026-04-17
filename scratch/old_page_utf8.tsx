@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
@@ -40,7 +40,7 @@ const GeoMap = dynamic(() => import("@/components/Map/GeoMap"), {
 
 const suggestions = [
   {
-    title: "🌍 Regional Analysis",
+    title: "≡ƒîì Regional Analysis",
     queries: [
       { label: "Districts with highest road density", query: "Which districts have the highest road density?" },
       { label: "Blocks in RI BHOI district", query: "Show blocks in RI BHOI district" },
@@ -48,7 +48,7 @@ const suggestions = [
     ]
   },
   {
-    title: "🏫 School Infrastructure",
+    title: "≡ƒÅ½ School Infrastructure",
     queries: [
       { label: "Schools without Electricity", query: "Show schools with no electricity connection" },
       { label: "Smart Classrooms and Computers", query: "Which schools have both computers and smart classrooms?" },
@@ -59,7 +59,7 @@ const suggestions = [
     ]
   },
   {
-    title: "📊 Advanced Analytics",
+    title: "≡ƒôè Advanced Analytics",
     queries: [
       { label: "Schools per SqKm (Block Density)", query: "Show blocks with highest school density" },
       { label: "Total Schools by District", query: "Show districts with the most schools" },
@@ -199,16 +199,16 @@ export default function Dashboard() {
       
       const features = data.geojson?.features || [];
       // Detect user intent to guide the map's filterMode without throwing away table stats
-      // Detect user intent based on keywords
       const queryLower = q.toLowerCase();
       let detectedIntent: 'all' | 'yes' | 'no' | 'issue' = 'all';
-      if (/\b(without|no|lack|missing|need|don't have|dont have|needs|lacking|unavailable|zero|none|not having)\b/.test(queryLower)) {
+      if (/\b(without|no|lack|missing|need|don't have|dont have|needs|lacking)\b/.test(queryLower)) {
           detectedIntent = 'no';
-      } else if (/\b(issue|problem|broken|functional issue|repair|partial|working condition|defect|maintenance)\b/.test(queryLower)) {
+      } else if (/\b(issue|problem|broken|functional issue|repair|partial)\b/.test(queryLower)) {
           detectedIntent = 'issue';
-      } else if (/\b(both|all|have|with|equipped|provided|available|functional|connected|present)\b/.test(queryLower)) {
+      } else if (/\b(both|all|have|with|equipped)\b/.test(queryLower)) {
           detectedIntent = 'yes';
       }
+      setMapFilterIntent(detectedIntent);
       
       if (data.table && data.table.length > 0) {
         // Collect ALL keys from the first 500 rows to ensure sparse data (like computers) is detected
@@ -239,22 +239,13 @@ export default function Dashboard() {
         let initialActive = "";
         let finalDynamicMetrics: {id: string, label: string}[] = [];
         
-        // Find the best metric to set as active based on user's query
-        const queryWords = queryLower.split(/\W+/);
-        const mentionedCol = numericCols.find(col => {
-            const lCol = col.toLowerCase();
-            return queryWords.some(word => word.length > 3 && lCol.includes(word));
-        });
-
         if (numericCols.length > 1) {
             const compositeKey = "All Selected Facilities";
             data.table = data.table.map((row: any) => {
                 const results = numericCols.map(k => {
                     const v = row[k];
-                    const val = Number(v);
-                    if (val === 1 || String(v).toLowerCase().trim() === 'yes' || String(v).toLowerCase().trim() === 'available') return 'pos';
-                    if (val === 0 || String(v).toLowerCase().trim() === 'no' || String(v).toLowerCase().trim() === 'unavailable') return 'neg';
-                    if (val === 2 || String(v).toLowerCase().includes('issue') || String(v).toLowerCase().includes('partial')) return 'iss';
+                    if (v === 1 || v === 1.0 || ['yes', 'true', 'functional', 'satisfactory', 'available', 'provided'].includes(String(v).toLowerCase().trim())) return 'pos';
+                    if (v === 0 || v === 0.0 || ['no', 'false', 'unavailable', 'missing', 'none'].includes(String(v).toLowerCase().trim())) return 'neg';
                     return 'iss';
                 });
                 
@@ -268,8 +259,7 @@ export default function Dashboard() {
                 {id: compositeKey, label: compositeKey},
                 ...numericCols.map(k => ({ id: k, label: k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))
             ];
-            // If user mentioned a specific column, prefer it over the composite summary
-            initialActive = mentionedCol || compositeKey;
+            initialActive = compositeKey;
         } else {
             finalDynamicMetrics = numericCols.map(k => ({ id: k, label: k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }));
             initialActive = numericCols[0] || "";
@@ -277,14 +267,8 @@ export default function Dashboard() {
         
         setDynamicMetrics(finalDynamicMetrics);
         if (initialActive) setActiveMetric(initialActive);
-        
-      } else {
-        // If chat-like or no table, reset to all
-        detectedIntent = 'all';
       }
 
-      // CRITICAL: Set filter intent BEFORE apiResult so map renders correctly from the start
-      setMapFilterIntent(detectedIntent);
       setApiResult(data);
       if (data.level) setMapLevel(data.level);
 
@@ -303,10 +287,7 @@ export default function Dashboard() {
         setApiResult((prev: any) => prev ? { ...prev, summary: "Analysis summary unavailable." } : null);
       });
     } catch (err: any) {
-      console.error("Search failed:", err);
-      setError(err.message || "An error occurred with the AI Spatial Engine. Please try a different query.");
-      setApiResult(null); // Clear stale results on error
-      setMapFilterIntent('all');
+      setError(err.message || "An error occurred");
     } finally {
       setIsSearching(false);
     }
