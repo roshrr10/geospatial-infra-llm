@@ -29,9 +29,10 @@ interface GeoMapProps {
     initialFilterIntent?: 'all' | 'yes' | 'no' | 'issue';
     viewMode: "polygon" | "map" | "dashboard" | "heatmap";
     apiResult?: any;
+    selectedRegion?: string;
 }
 
-export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, onFeatureClick, heatmapData, activeMetric, searchQuery, initialFilterIntent, viewMode, apiResult }: GeoMapProps) {
+export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, onFeatureClick, heatmapData, activeMetric, searchQuery, initialFilterIntent, viewMode, apiResult, selectedRegion }: GeoMapProps) {
     const mapRef = useRef<L.Map | null>(null);
     const geojsonLayerRef = useRef<L.GeoJSON | null>(null);
     const basemapLayerRef = useRef<L.GeoJSON | null>(null);
@@ -354,6 +355,16 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                 basemapLayerRef.current = L.geoJSON(basemap, {
                     pane: 'polygons',
                     style: getChoroplethStyle,
+                    filter: (feature) => {
+                        if (!selectedRegion) return true;
+                        const props = feature.properties || {};
+                        const dName = normalizeName(props.district_name);
+                        const bName = normalizeName(props.block_name);
+                        const target = normalizeName(selectedRegion);
+                        // In district view, we show all. In block view, we show blocks of a district.
+                        // So if we are at block level (geojson has blocks), we check if feature's district matches selectedRegion.
+                        return dName === target || bName === target;
+                    },
                 onEachFeature: (feature, layer) => {
                     const name = feature.properties?.block_name || feature.properties?.district_name || "Region";
                     layer.bindTooltip(`<div class="font-sans text-[10px] font-bold p-1">${name}</div>`, { sticky: true });
@@ -371,20 +382,6 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                 }
             }).addTo(map);
             }, 10);
-        }
-
-        // The GEOJSON LAYER (Dots) has been extracted to a separate atomic useEffect below.
-
-        // --- HEATMAP LAYER ---
-        if (viewMode === "heatmap" && heatmapData?.length) {
-            if (heatLayerRef.current) map.removeLayer(heatLayerRef.current);
-            heatRenderHandle = setTimeout(() => {
-                // @ts-ignore
-                heatLayerRef.current = (L as any).heatLayer(heatmapData, { radius: 25, blur: 15, max: 0.8 }).addTo(map);
-            }, 10);
-        } else if (heatLayerRef.current) {
-            map.removeLayer(heatLayerRef.current);
-            heatLayerRef.current = null;
         }
 
         // --- LEGEND AND MODE FINALIZATION ---
@@ -415,7 +412,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             clearTimeout(heatRenderHandle);
         };
 
-    }, [basemap, currentLevel, heatmapData, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode, geojson]);
+    }, [basemap, currentLevel, heatmapData, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode, geojson, selectedRegion]);
 
     // Atomic Style Refresher to force polygon color recalibrations instantly 
     // when filter buttons or metrics change, without touching the literal shape geometries.

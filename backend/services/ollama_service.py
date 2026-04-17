@@ -487,10 +487,11 @@ Context: Analyzed {total_analyzed} schools for gaps in {', '.join(target_cols)}.
 - Met all criteria: {joint_met}
 
 Rules:
-1. Do NOT use any Markdown characters like #, ##, *, **, or _.
-2. Provide exactly 3 small and important points in a numbered list format: 1., 2., 3.
-3. Keep it short, crisp, and clear. Maximum 2 sentences per point.
-4. Start directly with the first point.
+1. Return your response as a valid JSON object only.
+2. Structure: { "summary": "3 points in numbered list", "recommendations": "3 strategic policy points in numbered list" }
+3. Do NOT use any Markdown characters like #, ##, *, **, or _ inside the text.
+4. Keep points short, crisp, and clear. Maximum 2 sentences per point.
+5. Factual summary in "summary", Actionable strategies in "recommendations".
 
 Output:
 """
@@ -504,13 +505,43 @@ Output:
 
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(OLLAMA_URL, json=payload, timeout=25.0)
-            result = response.json().get("response", "").strip()
-            summary_cache.set(cache_key, result)
-            return result
+            response = await client.post(OLLAMA_URL, json=payload, timeout=45.0)
+            response.raise_for_status()
+            raw_res = response.json().get("response", "").strip()
+            
+            import json
+            import re
+            
+            try:
+                # Use regex to find the JSON block in case there is chatter
+                match = re.search(r"(\{.*\})", raw_res, re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group(1))
+                    # Ensure both keys exist
+                    if "summary" in parsed and "recommendations" in parsed:
+                        summary_cache.set(cache_key, parsed)
+                        return parsed
+                
+                # Fallback if parsing fails but there is text
+                fallback = {
+                    "summary": raw_res if raw_res else "Spatial analysis complete.",
+                    "recommendations": "Further policy interventions recommended for identified gaps."
+                }
+                summary_cache.set(cache_key, fallback)
+                return fallback
+                
+            except Exception as e:
+                logger.error(f"JSON Parse Error: {e}")
+                return {
+                    "summary": raw_res if raw_res else "Spatial analysis complete.",
+                    "recommendations": "Data-driven policy measures suggested for this region."
+                }
     except Exception as e:
         logger.error(f"AI Summary Error: {e}")
-        return f"### Analytics Summary\n\nAnalyzed {total_analyzed} records. Jointly met: {joint_met}."
+        return {
+            "summary": f"Analyzed {total_analyzed} records. Jointly met: {joint_met}.",
+            "recommendations": "Manual infrastructure audit recommended."
+        }
 
 async def get_heatmap_summary(metric: str, level: str, data: list):
     """

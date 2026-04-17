@@ -89,6 +89,7 @@ export default function Dashboard() {
   const [viewTab, setViewTab] = useState<"map"|"dashboard">("map");
   const [dynamicMetrics, setDynamicMetrics] = useState<{id: string, label: string}[]>([]);
   const [mapFilterIntent, setMapFilterIntent] = useState<'all' | 'yes' | 'no' | 'issue'>('all');
+  const [selectedRegion, setSelectedRegion] = useState<string | undefined>(undefined);
 
   // Voice Input States
   const [isListening, setIsListening] = useState(false);
@@ -173,6 +174,7 @@ export default function Dashboard() {
     setIsSearching(true);
     setApiResult(null);
     setError(null);
+    setSelectedRegion(undefined);
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/query`, {
         method: "POST",
@@ -389,6 +391,7 @@ export default function Dashboard() {
         level: nextLevel
       });
       setMapLevel(nextLevel as any);
+      setSelectedRegion(name);
       setIsDrawerOpen(true);
     } catch (err: any) {
       setError(err.message);
@@ -417,6 +420,7 @@ export default function Dashboard() {
     } else {
       setApiResult(null);
       setMapLevel("district");
+      setSelectedRegion(undefined);
     }
   };
 
@@ -731,6 +735,7 @@ export default function Dashboard() {
                 initialFilterIntent={mapFilterIntent} 
                 viewMode={viewMode} 
                 apiResult={apiResult} 
+                selectedRegion={selectedRegion}
               />
               <div className="absolute bottom-8 right-8 z-[1000] glass p-4 rounded-2xl w-64 space-y-2 shadow-2xl border border-white/20">
                 <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Sync</h4>
