@@ -213,8 +213,12 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
     };
 
     // Detect if the primary metric is binary (0, 1, 2 or Yes/No) 
-    // PREFER 'status' column if it exists for Venn logic
-    const primaryKey = keys.find(k => k.toLowerCase() === 'status' || k.toLowerCase() === 'combined_status') || numericKeys[0] || labelKey;
+    // PREFER status/attainment columns if they exist for Venn logic
+    const primaryKey = keys.find(k => 
+        k.toLowerCase() === 'status' || 
+        k.toLowerCase().includes('_attainment') || 
+        k.toLowerCase().includes('_status')
+    ) || numericKeys[0] || labelKey;
     const isBinaryField = primaryKey && (
         primaryKey.toLowerCase().includes('solar') ||
         primaryKey.toLowerCase().includes('panel') ||

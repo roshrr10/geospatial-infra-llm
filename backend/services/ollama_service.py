@@ -166,7 +166,7 @@ async def get_sql_from_llm(question: str):
                     WHEN (i.no_of_computer > 0) THEN 'Only Computer'
                     WHEN (i.smart_classroom_available_in_school_1_yes_2_no = 1) THEN 'Only Smart'
                     ELSE 'Neither'
-                 END as status,
+                 END as comp_smart_attainment,
                  s.geometry
                  FROM meghalaya_schools s
                  JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
@@ -184,7 +184,7 @@ async def get_sql_from_llm(question: str):
                     WHEN (i.electricity_connection_available = 1) THEN 'Only Electricity'
                     WHEN (i.drinking_water_availability = 1) THEN 'Only Water'
                     ELSE 'Neither'
-                 END as status,
+                 END as electricity_water_attainment,
                  s.geometry
                  FROM meghalaya_schools s
                  JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
@@ -203,7 +203,7 @@ async def get_sql_from_llm(question: str):
                     WHEN (i.internet_facility_available_in_school_1_yes_2_no = 1) THEN 'Only Internet'
                     WHEN (i.smart_classroom_available_in_school_1_yes_2_no = 1) THEN 'Only Smart'
                     ELSE 'Neither'
-                 END as status,
+                 END as internet_smart_attainment,
                  s.geometry
                  FROM meghalaya_schools s
                  JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""

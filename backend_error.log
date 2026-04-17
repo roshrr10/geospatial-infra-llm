@@ -6472,3 +6472,27 @@ FROM meghalaya_schools s
 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text
 GROUP BY district_name
 ORDER BY fire_extinguishers_availability, smart_classrooms_availability, internet_availability, computer_availability DESC;
+
+
+SUMMARY ERROR:
+Invalid format specifier
+
+TRACE:
+Traceback (most recent call last):
+  File "C:\ROSH\DeepSpatial\geospatial-infra-llm\backend\main.py", line 108, in handle_summary
+    summary = await get_summary_from_llm(request.question, request.data)
+  File "C:\ROSH\DeepSpatial\geospatial-infra-llm\backend\services\ollama_service.py", line 481, in get_summary_from_llm
+    prompt = f"""
+ValueError: Invalid format specifier
+
+
+SUMMARY ERROR:
+Invalid format specifier
+
+TRACE:
+Traceback (most recent call last):
+  File "C:\ROSH\DeepSpatial\geospatial-infra-llm\backend\main.py", line 108, in handle_summary
+    summary = await get_summary_from_llm(request.question, request.data)
+  File "C:\ROSH\DeepSpatial\geospatial-infra-llm\backend\services\ollama_service.py", line 481, in get_summary_from_llm
+    prompt = f"""
+ValueError: Invalid format specifier

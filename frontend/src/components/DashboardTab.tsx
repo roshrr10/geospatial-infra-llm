@@ -119,23 +119,23 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
         data.slice(0, 10).every(d => isPos(d[k]) || isNeg(d[k]) || isIss(d[k]) || d[k] == null)
     );
 
-    const isMultiBinaryMode = binaryCols.length === 2;
-    const multiStats: any[] = [];
-    
     if (isMultiBinaryMode) {
         const s1 = binaryCols[0];
         const s2 = binaryCols[1];
         
+        // Find a status column if it exists (e.g. comp_smart_attainment)
+        const statusKey = Object.keys(sample).find(k => k.toLowerCase().includes('_attainment') || k.toLowerCase().includes('_status'));
+
         let both = 0, onlyX = 0, onlyY = 0, neither = 0;
         data.forEach(d => {
             // Check if backend already provided a calculated status
-            const sVal = safeStr(d['status']);
+            const sVal = safeStr(d[statusKey || 'status']);
             if (sVal === 'both') both++;
             else if (sVal.includes('only') && sVal.includes(s1.split('_')[0])) onlyX++;
             else if (sVal.includes('only') && sVal.includes(s2.split('_')[0])) onlyY++;
-            else if (sVal === 'neither') neither++;
+            else if (sVal === 'neither' || sVal === 'none') neither++;
             else {
-                // Fallback to manual calc if status column missing or different
+                // Fallback to manual calc
                 const p1 = isPos(d[s1]);
                 const p2 = isPos(d[s2]);
                 if (p1 && p2) both++;
@@ -146,10 +146,10 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
         });
 
         multiStats.push(
-            { name: 'Both Units', value: both, color: '#10b981', label: `${binaryCols[0]} & ${binaryCols[1]}` },
-            { name: `Only ${s1.split('_')[0]}`, value: onlyX, color: '#3b82f6', label: `${binaryCols[0]} Only` },
-            { name: `Only ${s2.split('_')[0]}`, value: onlyY, color: '#f59e0b', label: `${binaryCols[1]} Only` },
-            { name: 'Neither Facility', value: neither, color: '#ef4444', label: 'Neither' }
+            { name: 'Both', value: both, color: '#10b981', label: 'Joint Compliance' },
+            { name: s1.split('_')[0].charAt(0).toUpperCase() + s1.split('_')[0].slice(1), value: onlyX, color: '#3b82f6', label: `${s1.split('_')[0]} only` },
+            { name: s2.split('_')[0].charAt(0).toUpperCase() + s2.split('_')[0].slice(1), value: onlyY, color: '#f59e0b', label: `${s2.split('_')[0]} only` },
+            { name: 'None', value: neither, color: '#ef4444', label: 'No Facility' }
         );
     }
 

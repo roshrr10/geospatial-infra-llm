@@ -1,0 +1,35 @@
+Column | Values
+------------------------------
+computer_room | 1.0, 0.0, nan
+library_facility | 0, 1
+playground_available | 0, 1
+ramp_available | 0, 1
+drinking_water_availability | 0, 1
+medical_facilities | Error: (psycopg2.errors.UndefinedColumn) column "medical_facilities" does not exist
+LINE 1: SELECT DISTINCT "medical_facilities" FROM meghalaya_infrastr...
+                        ^
+
+[SQL: SELECT DISTINCT "medical_facilities" FROM meghalaya_infrastructure]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+solar_panel | 0, 1, 2
+internet_facility_available_in_school | Error: (psycopg2.errors.UndefinedColumn) column "internet_facility_available_in_school" does not exist
+LINE 1: SELECT DISTINCT "internet_facility_available_in_school" FROM...
+                        ^
+
+[SQL: SELECT DISTINCT "internet_facility_available_in_school" FROM meghalaya_infrastructure]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+smart_classroom_available_in_school | Error: (psycopg2.errors.UndefinedColumn) column "smart_classroom_available_in_school" does not exist
+LINE 1: SELECT DISTINCT "smart_classroom_available_in_school" FROM m...
+                        ^
+
+[SQL: SELECT DISTINCT "smart_classroom_available_in_school" FROM meghalaya_infrastructure]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+eletricity_connection_available | Error: (psycopg2.errors.UndefinedColumn) column "eletricity_connection_available" does not exist
+LINE 1: SELECT DISTINCT "eletricity_connection_available" FROM megha...
+                        ^
+HINT:  Perhaps you meant to reference the column "meghalaya_infrastructure.electricity_connection_available".
+
+[SQL: SELECT DISTINCT "eletricity_connection_available" FROM meghalaya_infrastructure]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+boy_toilet_available | 0, 1
+girls_toilet_available | 0, 1
