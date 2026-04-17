@@ -49,6 +49,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
     const activeMetricRef = useRef(activeMetric);
     const viewModeRef = useRef(viewMode);
     const regionCountsRef = useRef<Record<string, number>>({});
+    const styleFuncRef = useRef<any>(null);
     
     // ── FIXED STATUS HELPERS (CZ3Y1UY8X Logic Restored) ──
     const isPos = (v: any, key?: string) => {
@@ -325,6 +326,8 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             return defaultStyle;
         };
 
+        styleFuncRef.current = getChoroplethStyle;
+
         // 1. Ensure map panes exist for layering control
         if (!map.getPane('polygons')) {
             map.createPane('polygons');
@@ -413,6 +416,14 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         };
 
     }, [basemap, currentLevel, heatmapData, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode, geojson]);
+
+    // Atomic Style Refresher to force polygon color recalibrations instantly 
+    // when filter buttons or metrics change, without touching the literal shape geometries.
+    useEffect(() => {
+        if (basemapLayerRef.current && styleFuncRef.current) {
+            basemapLayerRef.current.setStyle(styleFuncRef.current);
+        }
+    }, [regionCounts, activeMetric, gradientMetric, filterMode, viewMode]);
 
     // Isolated hook entirely dedicated to School Point Markers rendering
     useEffect(() => {

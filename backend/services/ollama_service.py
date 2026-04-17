@@ -121,9 +121,30 @@ async def get_sql_from_llm(question: str):
                 sql = f"SELECT block_name, district_name, total_schools, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final WHERE district_name = '{target_dist}' ORDER BY total_schools DESC;"
                 result = (sql, "block")
             else:
-                # Default: Show all schools in this district with potential infra Join
-                # Check if specific infra column is mentioned
-                infra_col = next((c for c in ['electricity_connection_available', 'drinking_water_availability', 'no_of_computer', 'smart_classroom_available_in_school_1_yes_2_no', 'library_facility'] if c.split('_')[0] in q_lower), 'electricity_connection_available')
+                # Robust Detection for infra metrics
+                metrics_map = {
+                    'electricity': 'electricity_connection_available',
+                    'water': 'drinking_water_availability',
+                    'drinking': 'drinking_water_availability',
+                    'computer': 'no_of_computer',
+                    'smart': 'smart_classroom_available_in_school_1_yes_2_no',
+                    'classroom': 'smart_classroom_available_in_school_1_yes_2_no',
+                    'library': 'library_facility',
+                    'ramp': 'ramp_available',
+                    'solar': 'solar_panel',
+                    'playground': 'playground_available',
+                    'internet': 'internet_facility_available_in_school_1_yes_2_no',
+                    'fire': 'fire_extinguisher_available_1_yes_2_no',
+                    'handwash': 'hand_washing_facility_near_toilet',
+                    'hand wash': 'hand_washing_facility_near_toilet'
+                }
+                
+                infra_col = 'electricity_connection_available'
+                for kw, col in metrics_map.items():
+                    if kw in q_lower:
+                        infra_col = col
+                        break
+
                 sql = f"""-- NO_STRIP
                         SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.{infra_col}, s.geometry 
                         FROM meghalaya_schools s 
@@ -467,8 +488,8 @@ Context: Analyzed {total_analyzed} schools for gaps in {', '.join(target_cols)}.
 
 Rules:
 1. Start with "### Analytics Summary"
-2. Provide exactly 3 bullet points: Key Findings (mention counts for all 3 categories: With, Without, Issue), Spatial Gaps, and Priority Recommendations.
-3. Be specific and data-driven.
+2. Keep it short, crisp, and clear.
+3. Provide exactly 3 small and important bullet points pulling from the data. Do NOT write paragraphs. Maximum 2 sentences per point.
 
 Output:
 """
