@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { X, TrendingUp, BarChart3, PieChartIcon, Lightbulb, Download, Target, MapPin, Navigation } from 'lucide-react';
+import { X, TrendingUp, BarChart3, PieChartIcon, Lightbulb, Download, Target, MapPin, Navigation, Sparkles } from 'lucide-react';
 
 interface AnalyticsDrawerProps {
     data: any[];
@@ -256,6 +256,7 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
             .join(' ');
     };
 
+    const isMultiBinaryMode = multiBinaryKeys.length >= 2;
     const vennStats = (isMultiBinaryMode && multiBinaryKeys.length === 2) ? (() => {
         const s1 = multiBinaryKeys[0];
         const s2 = multiBinaryKeys[1];
