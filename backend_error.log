@@ -6496,3 +6496,15 @@ Traceback (most recent call last):
   File "C:\ROSH\DeepSpatial\geospatial-infra-llm\backend\services\ollama_service.py", line 481, in get_summary_from_llm
     prompt = f"""
 ValueError: Invalid format specifier
+
+
+REPORT ERROR:
+name 'check_val' is not defined
+
+TRACE:
+Traceback (most recent call last):
+  File "C:\ROSH\DeepSpatial\geospatial-infra-llm\backend\main.py", line 192, in handle_report
+    pdf_buffer = generate_pdf_report(
+  File "C:\ROSH\DeepSpatial\geospatial-infra-llm\backend\services\report_service.py", line 278, in generate_pdf_report
+    if check_val(d, 'no'): dist_data[dist]['missing'] += 1
+NameError: name 'check_val' is not defined

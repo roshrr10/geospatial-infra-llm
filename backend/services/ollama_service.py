@@ -520,31 +520,27 @@ async def get_summary_from_llm(question: str, data: list):
                 if any(s == 'yes' for s in statuses.values()): total_both += 1
 
         # 2. Optimized Prompt with Multi-Metric Context
-        stats_context = f"Total Records: {total_analyzed}\nCriteria: {', '.join(target_cols)}\n"
+        sc = f"Total Records: {total_analyzed}\nCriteria: {', '.join(target_cols)}\n"
         for col, stats in individual_stats.items():
-            stats_context += f"- {col}: {stats['yes']} Equipped, {stats['no']} Missing\n"
+            sc += f"- {col}: {stats['yes']} Equipped, {stats['no']} Missing\n"
         
         if len(target_cols) == 2:
-            stats_context += f"\nOverlap Analysis (Venn-Logic):\n- Both {target_cols[0]} AND {target_cols[1]}: {total_both}\n- ONLY {target_cols[0]}: {total_only_x}\n- ONLY {target_cols[1]}: {total_only_y}\n- Neither: {total_neither}\n"
+            sc += f"\nOverlap Analysis (Venn-Logic):\n- Both {target_cols[0]} AND {target_cols[1]}: {total_both}\n- ONLY {target_cols[0]}: {total_only_x}\n- ONLY {target_cols[1]}: {total_only_y}\n- Neither: {total_neither}\n"
         
-        prompt = f"""
-System: You are the Meghalaya GeoAI Assistant. Summarize the spatial data findings below.
-Persona: Analytical, professional Government Consultant.
-Context: Analyzed {total_analyzed} schools for gaps in {', '.join(target_cols)}.
-
-{stats_context}
-- Met all criteria: {total_both}
-
-Rules:
-1. Return your response as a valid JSON object only.
-2. Structure: {{ "summary": ["Point 1", "Point 2", "Point 3"], "recommendations": ["Point 1", "Point 2", "Point 3"] }}
-3. Do NOT use any Markdown characters like #, ##, *, **, or _ inside the text.
-4. Keep each point short, crisp, and clear (1 sentence preferred). 
-5. Provide precisely 3 points for the summary and 3 points for recommendations.
-6. Return a JSON array of strings for both keys.
-
-Output:
-"""
+        # Build prompt without nested f-string complexity to avoid "Invalid format specifier"
+        prompt = "System: You are the Meghalaya GeoAI Assistant. Summarize the spatial data findings below.\n"
+        prompt += "Persona: Analytical, professional Government Consultant.\n"
+        prompt += f"Context: Analyzed {total_analyzed} schools for gaps in {', '.join(target_cols)}.\n\n"
+        prompt += sc
+        prompt += f"\n- Met all criteria: {total_both}\n\n"
+        prompt += "Rules:\n"
+        prompt += "1. Return your response as a valid JSON object only.\n"
+        prompt += '2. Structure: { "summary": ["Point 1", "Point 2", "Point 3"], "recommendations": ["Point 1", "Point 2", "Point 3"] }\n'
+        prompt += "3. Do NOT use any Markdown characters like #, ##, *, **, or _ inside the text.\n"
+        prompt += "4. Keep each point short, crisp, and clear (1 sentence preferred).\n"
+        prompt += "5. Provide precisely 3 points for the summary and 3 points for recommendations.\n"
+        prompt += "6. Return a JSON array of strings for both keys.\n\n"
+        prompt += "Output:"
 
         payload = {
             "model": MODEL,

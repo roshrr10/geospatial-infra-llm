@@ -224,6 +224,22 @@ def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.Byte
             positives = ['1', '1.0', 'yes', 'true', 'functional', 'satisfactory', 'available', 'provided', 'both']
             return val == 1 or val == 1.0 or str(val).lower().strip() in positives
 
+        def check_val(d, target):
+            # Target 'yes' means ALL criteria met (Both)
+            # Target 'no' means BOTH criteria missing (Neither)
+            # Target 'issue' means partial compliance
+            metrics_to_check = detected_infra if is_multi else [resolved_metric]
+            
+            p_flags = [match(d.get(m)) for m in metrics_to_check]
+            
+            if target == 'yes':
+                return all(p_flags)
+            if target == 'no':
+                return not any(p_flags)
+            if target == 'issue':
+                return any(p_flags) and not all(p_flags)
+            return False
+
         total = len(data)
 
         if is_multi:
@@ -245,13 +261,12 @@ def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.Byte
                            f"<b>Only {m2_name}:</b> {only2} ({round(only2/total*100, 1)}%)<br/>" \
                            f"<b>None (Total Gap):</b> {neither} ({round(neither/total*100, 1)}%)"
             
-            # Use Both/Neither for charts
             yes_count, no_count, issue_count = both, neither, only1 + only2
             labels = ["Both Met", "None Met", "Partial Compliance"]
         else:
             yes_count = len([d for d in data if match(d.get(resolved_metric))])
             no_count = total - yes_count
-            issue_count = 0 # Single binary doesn't have 'issue' logic here yet
+            issue_count = 0
             
             summary_text = f"<b>Total Records:</b> {total}<br/>" \
                            f"<b>Equipped/Available:</b> {yes_count} ({round(yes_count/total*100, 1)}%)<br/>" \
