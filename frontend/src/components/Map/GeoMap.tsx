@@ -363,6 +363,7 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                 });
             }
         }).addTo(map);
+        }
 
         // The GEOJSON LAYER (Dots) has been extracted to a separate atomic useEffect below.
 
