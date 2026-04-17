@@ -604,7 +604,18 @@ export default function Dashboard() {
                         <h3 className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
                           <Info size={14} /> AI Analysis
                         </h3>
-                        <p className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">{apiResult.summary}</p>
+                        <div className="space-y-4">
+                          {(() => {
+                            const summaryData = typeof apiResult.summary === 'object' ? apiResult.summary.summary : [apiResult.summary];
+                            const points = Array.isArray(summaryData) ? summaryData : [summaryData];
+                            return points.map((pt: any, i: number) => (
+                              <p key={i} className="text-sm font-semibold text-slate-700 leading-relaxed flex gap-2">
+                                <span className="text-blue-500 font-black">•</span>
+                                <span>{pt}</span>
+                              </p>
+                            ));
+                          })()}
+                        </div>
                         <button onClick={() => setIsDrawerOpen(true)} className="w-full py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase mt-4">View Analytics Table</button>
                       </div>
 

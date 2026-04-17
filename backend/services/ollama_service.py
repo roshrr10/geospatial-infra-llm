@@ -37,11 +37,10 @@ If the user asks for ANY infrastructure data or counts (e.g., "schools with...",
   - If asked for "number of schools" by district, you MUST use `SUM(total_schools)` from `meghalaya_block_intelligence_final` and GROUP BY `district_name`. NEVER use `total_schools` on the district table.
   - If asked for "blocks in [District]", use `SELECT block_name, district_name, total_schools, geometry FROM meghalaya_block_intelligence_final WHERE district_name ILIKE '%[District]%';`
   - If asked for "road density" or "school density", use `avg_road_density` or `avg_school_density` from `meghalaya_district_intelligence_final`.
-- MULTI-METRIC RULE: If multiple items are mentioned (e.g. "both computers and smart classrooms"), include ALL relevant infra columns INDIVIDUALLY in your `SELECT` statement. This ensures the dashboard charts can show each metric.
-- ALIASING RULE: NEVER return a column without a clear name. If you use a calculation or boolean expression (e.g., `i.no_of_computer > 0`), you MUST alias it: `(i.no_of_computer > 0) as has_computers`.
+- BOTH/COMBINED RULE: If the query contains "both", "all of", or "and" for metrics (e.g., "schools with both X and Y"), you MUST select ALL schools (remove WHERE clauses for X/Y) but select individual infrastructure columns so the dashboard can calculate subsets (Both, Only X, Only Y, Neither).
 - MANDATORY COLUMNS: Always include `geometry`, identifiers (`udise_num`), AND context columns (`district_name`, `block_name`).
-- SCAN RULE: When asked for "Schools with X" or "Schools lacking Y", generate SQL that selects ALL schools (with status columns) but do NOT include `WHERE X = 1` or `WHERE Y = 0`. The dashboard needs ALL data points to calculate the full status breakdown (With, Without, Issues).
-- EXAMPLE: User "Schools with both electricity and water" -> Response "SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.electricity_connection_available, i.drinking_water_availability, s.geometry FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"
+- SCAN RULE: For comparative or general distribution queries (e.g. "lacking electricity", "both computers and smart classrooms"), generate SQL that selects ALL schools (with status columns) but do NOT include `WHERE X = 1` or `WHERE Y = 0`. The dashboard needs ALL data points to calculate full gaps.
+- EXAMPLE: User "Schools with both computers and smart classrooms" -> Response "SELECT s."schoolName", s.district_name, s.block_name, i.no_of_computer, i.smart_classroom_available_in_school_1_yes_2_no, s.geometry FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"
 """
 _model_warmed = False
 
@@ -155,6 +154,65 @@ async def get_sql_from_llm(question: str):
             llm_cache.set(question, result)
             return result
 
+    # --- JOINT INFRASTRUCTURE FALLBACKS (Priority) ---
+    
+    # Computers AND Smart Classrooms (User Test Case)
+    if 'computer' in q_lower and ('smart' in q_lower or 'classroom' in q_lower):
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.no_of_computer, i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
+                 CASE 
+                    WHEN (i.no_of_computer > 0 AND i.smart_classroom_available_in_school_1_yes_2_no = 1) THEN 'Both'
+                    WHEN (i.no_of_computer > 0) THEN 'Only Computer'
+                    WHEN (i.smart_classroom_available_in_school_1_yes_2_no = 1) THEN 'Only Smart'
+                    ELSE 'Neither'
+                 END as status,
+                 s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # Electricity AND water
+    if ('electricity' in q_lower and 'water' in q_lower):
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.electricity_connection_available, i.drinking_water_availability,
+                 CASE 
+                    WHEN (i.electricity_connection_available = 1 AND i.drinking_water_availability = 1) THEN 'Both'
+                    WHEN (i.electricity_connection_available = 1) THEN 'Only Electricity'
+                    WHEN (i.drinking_water_availability = 1) THEN 'Only Water'
+                    ELSE 'Neither'
+                 END as status,
+                 s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # Internet AND smart classrooms  
+    if ('internet' in q_lower and ('smart' in q_lower or 'classroom' in q_lower)):
+        sql = """-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
+                 i.internet_facility_available_in_school_1_yes_2_no as internet_available,
+                 i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
+                 CASE 
+                    WHEN (i.internet_facility_available_in_school_1_yes_2_no = 1 AND i.smart_classroom_available_in_school_1_yes_2_no = 1) THEN 'Both'
+                    WHEN (i.internet_facility_available_in_school_1_yes_2_no = 1) THEN 'Only Internet'
+                    WHEN (i.smart_classroom_available_in_school_1_yes_2_no = 1) THEN 'Only Smart'
+                    ELSE 'Neither'
+                 END as status,
+                 s.geometry
+                 FROM meghalaya_schools s
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+        result = (sql, "school")
+        llm_cache.set(question, result)
+        return result
+
+    # --- SINGLE METRIC FALLBACKS ---
+
     # Computers
     if 'computer' in q_lower:
         sql = """-- NO_STRIP
@@ -177,27 +235,13 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
-    # Electricity AND water
-    if ('electricity' in q_lower and 'water' in q_lower):
+    # SOLAR PANEL
+    if 'solar' in q_lower or 'panel' in q_lower:
         sql = """-- NO_STRIP
                  SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.electricity_connection_available, i.drinking_water_availability,
-                 s.geometry
+                 i.solar_panel, s.geometry
                  FROM meghalaya_schools s
-                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11);"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # Internet AND smart classrooms  
-    if ('internet' in q_lower and 'smart' in q_lower):
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.internet_facility_available_in_school_1_yes_2_no as internet_available,
-                 i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom,
-                 s.geometry
-                 FROM meghalaya_schools s
-                 LEFT JOIN meghalaya_infrastructure i ON LEFT(s.udise_num::text, 11) = LEFT(i.udise_code::text, 11);"""
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
@@ -205,7 +249,7 @@ async def get_sql_from_llm(question: str):
     # --- DENSITY & AGGREGATE FALLBACKS ---
     if 'road density' in q_lower and 'district' in q_lower:
         sql = """-- NO_STRIP
-                 SELECT district_name, avg_road_density 
+                 SELECT district_name, avg_road_density, geometry
                  FROM meghalaya_district_intelligence_final 
                  ORDER BY avg_road_density DESC;"""
         result = (sql, "district")
@@ -215,7 +259,7 @@ async def get_sql_from_llm(question: str):
     if 'school density' in q_lower or 'per sqkm' in q_lower:
         if 'block' in q_lower:
             sql = """-- NO_STRIP
-                     SELECT block_name, district_name, schools_per_sqkm as school_density 
+                     SELECT block_name, district_name, schools_per_sqkm as school_density, geometry
                      FROM meghalaya_block_intelligence_final 
                      ORDER BY school_density DESC;"""
             result = (sql, "block")
@@ -223,7 +267,7 @@ async def get_sql_from_llm(question: str):
             return result
         elif 'district' in q_lower:
             sql = """-- NO_STRIP
-                     SELECT district_name, avg_school_density as school_density 
+                     SELECT district_name, avg_school_density as school_density, geometry
                      FROM meghalaya_district_intelligence_final 
                      ORDER BY school_density DESC;"""
             result = (sql, "district")
@@ -232,21 +276,11 @@ async def get_sql_from_llm(question: str):
 
     if 'total schools' in q_lower and 'district' in q_lower:
         sql = """-- NO_STRIP
-                 SELECT district_name, avg_total_schools as total_schools 
-                 FROM meghalaya_district_intelligence_final 
+                 SELECT district_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry
+                 FROM meghalaya_block_intelligence_final 
+                 GROUP BY district_name
                  ORDER BY total_schools DESC;"""
         result = (sql, "district")
-        llm_cache.set(question, result)
-        return result
-
-    # SOLAR PANEL
-    if 'solar' in q_lower or 'panel' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.solar_panel, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
         llm_cache.set(question, result)
         return result
 
@@ -447,63 +481,78 @@ async def get_summary_from_llm(question: str, data: list):
     target_cols = [c for c in infra_cols if c in data[0] and (c.split('_')[0] in q_low or (c=='smart_classroom_available_in_school_1_yes_2_no' and 'smart' in q_low))]
     
     # Fallback if none detected by keyword
-    if not target_cols:
-        target_cols = [next((c for c in infra_cols if c in data[0]), 'electricity_connection_available')]
+    try:
+        if not target_cols:
+            target_cols = [next((c for c in infra_cols if c in data[0]), 'electricity_connection_available')]
 
-    # Calculate Joint Stats
-    joint_met = 0
-    joint_no = 0
-    joint_issue = 0
-    individual_stats = {c: {'yes': 0, 'no': 0, 'issue': 0} for c in target_cols}
-    
-    def get_status(val, col_name):
-        v = int(val) if val is not None else 0
-        if col_name == 'no_of_computer':
-            return 'yes' if v > 0 else 'no'
-        if v == 1: return 'yes'
-        if v == 2: return 'issue'
-        return 'no'
-
-    for d in data:
-        statuses = {col: get_status(d.get(col), col) for col in target_cols}
-        for col, stat in statuses.items():
-            individual_stats[col][stat] += 1
+        # Calculate Overlap Stats (Venn Logic)
+        total_both = 0
+        total_only_x = 0
+        total_only_y = 0
+        total_neither = 0
         
-        if all(s == 'yes' for s in statuses.values()): joint_met += 1
-        if any(s == 'no' for s in statuses.values()): joint_no += 1
-        if any(s == 'issue' for s in statuses.values()) and not any(s == 'no' for s in statuses.values()): joint_issue += 1
+        individual_stats = {c: {'yes': 0, 'no': 0, 'issue': 0} for c in target_cols}
+        
+        def get_status(val, col_name):
+            if val is None: return 'no'
+            s_val = str(val).lower().strip()
+            if col_name == 'no_of_computer':
+                try: return 'yes' if int(val) > 0 else 'no'
+                except: return 'no'
+            if s_val in ['1', 'yes', 'available', 'true']: return 'yes'
+            if s_val in ['2', 'issue', 'partial', 'not functional']: return 'issue'
+            return 'no'
 
-    # 2. Optimized Prompt with Multi-Metric Context
-    stats_context = f"Total Records: {total_analyzed}\nCriteria: {', '.join(target_cols)}\n"
-    for col, stats in individual_stats.items():
-        stats_context += f"- {col}: {stats['yes']} With, {stats['no']} Without, {stats['issue']} Issues\n"
-    
-    prompt = f"""
+        for d in data:
+            statuses = {col: get_status(d.get(col), col) for col in target_cols}
+            for col, stat in statuses.items():
+                individual_stats[col][stat] += 1
+            
+            # Venn logic for multi-metric queries
+            if len(target_cols) >= 2:
+                s1, s2 = target_cols[0], target_cols[1]
+                v1, v2 = statuses[s1], statuses[s2]
+                if v1 == 'yes' and v2 == 'yes': total_both += 1
+                elif v1 == 'yes' and v2 != 'yes': total_only_x += 1
+                elif v2 == 'yes' and v1 != 'yes': total_only_y += 1
+                elif v1 != 'yes' and v2 != 'yes': total_neither += 1
+            else:
+                if any(s == 'yes' for s in statuses.values()): total_both += 1
+
+        # 2. Optimized Prompt with Multi-Metric Context
+        stats_context = f"Total Records: {total_analyzed}\nCriteria: {', '.join(target_cols)}\n"
+        for col, stats in individual_stats.items():
+            stats_context += f"- {col}: {stats['yes']} Equipped, {stats['no']} Missing\n"
+        
+        if len(target_cols) == 2:
+            stats_context += f"\nOverlap Analysis (Venn-Logic):\n- Both {target_cols[0]} AND {target_cols[1]}: {total_both}\n- ONLY {target_cols[0]}: {total_only_x}\n- ONLY {target_cols[1]}: {total_only_y}\n- Neither: {total_neither}\n"
+        
+        prompt = f"""
 System: You are the Meghalaya GeoAI Assistant. Summarize the spatial data findings below.
 Persona: Analytical, professional Government Consultant.
 Context: Analyzed {total_analyzed} schools for gaps in {', '.join(target_cols)}.
 
 {stats_context}
-- Met all criteria: {joint_met}
+- Met all criteria: {total_both}
 
 Rules:
 1. Return your response as a valid JSON object only.
-2. Structure: { "summary": "3 points in numbered list", "recommendations": "3 strategic policy points in numbered list" }
+2. Structure: {{ "summary": ["Point 1", "Point 2", "Point 3"], "recommendations": ["Point 1", "Point 2", "Point 3"] }}
 3. Do NOT use any Markdown characters like #, ##, *, **, or _ inside the text.
-4. Keep points short, crisp, and clear. Maximum 2 sentences per point.
-5. Factual summary in "summary", Actionable strategies in "recommendations".
+4. Keep each point short, crisp, and clear (1 sentence preferred). 
+5. Provide precisely 3 points for the summary and 3 points for recommendations.
+6. Return a JSON array of strings for both keys.
 
 Output:
 """
 
-    payload = {
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.0, "num_predict": 250}
-    }
+        payload = {
+            "model": MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.0, "num_predict": 250}
+        }
 
-    try:
         async with httpx.AsyncClient() as client:
             response = await client.post(OLLAMA_URL, json=payload, timeout=45.0)
             response.raise_for_status()
@@ -524,8 +573,8 @@ Output:
                 
                 # Fallback if parsing fails but there is text
                 fallback = {
-                    "summary": raw_res if raw_res else "Spatial analysis complete.",
-                    "recommendations": "Further policy interventions recommended for identified gaps."
+                    "summary": [raw_res if raw_res else "Spatial analysis complete."],
+                    "recommendations": ["Further policy interventions recommended for identified gaps."]
                 }
                 summary_cache.set(cache_key, fallback)
                 return fallback
@@ -533,14 +582,16 @@ Output:
             except Exception as e:
                 logger.error(f"JSON Parse Error: {e}")
                 return {
-                    "summary": raw_res if raw_res else "Spatial analysis complete.",
-                    "recommendations": "Data-driven policy measures suggested for this region."
+                    "summary": [raw_res if raw_res else "Spatial analysis complete."],
+                    "recommendations": ["Data-driven policy measures suggested for this region."]
                 }
     except Exception as e:
         logger.error(f"AI Summary Error: {e}")
+        # Ensure fallback variables are safe
+        j_met = total_both if 'total_both' in locals() else 0
         return {
-            "summary": f"Analyzed {total_analyzed} records. Jointly met: {joint_met}.",
-            "recommendations": "Manual infrastructure audit recommended."
+            "summary": [f"Analyzed {total_analyzed} records. Jointly met: {j_met}."],
+            "recommendations": ["Manual infrastructure audit recommended."]
         }
 
 async def get_heatmap_summary(metric: str, level: str, data: list):

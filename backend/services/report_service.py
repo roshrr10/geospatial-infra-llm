@@ -149,11 +149,35 @@ def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.Byte
 
     # 2. Executive Summary (AI Insights)
     if summary:
-        # Clean summary of Markdown artifacts (##, *, **)
-        clean_summary = summary.replace('###', '').replace('##', '').replace('**', '').replace('*', '').strip()
-        elements.append(Paragraph("Executive Insights", header_style))
-        elements.append(Paragraph(clean_summary.replace('\n', '<br/>'), styles['Normal']))
-        elements.append(Spacer(1, 0.3 * inch))
+        # Determine if we have a structured object or a plain string
+        analysis_points = []
+        policy_points = []
+
+        if isinstance(summary, dict):
+            # Extract points from structured object
+            s_raw = summary.get('summary', [])
+            r_raw = summary.get('recommendations', [])
+            analysis_points = s_raw if isinstance(s_raw, list) else [str(s_raw)]
+            policy_points = r_raw if isinstance(r_raw, list) else [str(r_raw)]
+        else:
+            # Legacy string support
+            analysis_points = [str(summary)]
+
+        # Render Analytical Report
+        if analysis_points:
+            elements.append(Paragraph("Analytical Report", header_style))
+            for pt in analysis_points:
+                clean_pt = pt.replace('###', '').replace('##', '').replace('**', '').replace('*', '').strip()
+                elements.append(Paragraph(f"• {clean_pt}", styles['Normal']))
+            elements.append(Spacer(1, 0.2 * inch))
+
+        # Render Policy Recommendations
+        if policy_points:
+            elements.append(Paragraph("Strategic Policy Recommendations", header_style))
+            for pt in policy_points:
+                clean_pt = pt.replace('###', '').replace('##', '').replace('**', '').replace('*', '').strip()
+                elements.append(Paragraph(f"• {clean_pt}", styles['Normal']))
+            elements.append(Spacer(1, 0.3 * inch))
 
     # Detect all relevant infrastructure columns in the current dataset
     infra_keywords = ['solar', 'panel', 'electricity', 'eletricity', 'water', 'toilet', 'computer', 'facility', 'internet', 'smart', 'ramp', 'playground', 'lab', 'library', 'boundary', 'quarters', 'furniture', 'books', 'extinguisher', 'uniform', 'textbook', 'hostel', 'room', 'handwash', 'equipment', 'laboratory', 'board', 'projector', 'tablet', 'desktop', 'laptop', 'sanitary']

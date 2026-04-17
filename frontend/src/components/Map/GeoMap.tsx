@@ -352,21 +352,31 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 
         if (basemap && viewMode !== 'heatmap') {
             baseRenderHandle = setTimeout(() => {
+                const getVal = (p: any, keywords: string[]) => {
+                    const key = Object.keys(p).find(k => keywords.some(kw => k.toLowerCase().includes(kw)));
+                    return key ? p[key] : null;
+                };
+
                 basemapLayerRef.current = L.geoJSON(basemap, {
                     pane: 'polygons',
                     style: getChoroplethStyle,
                     filter: (feature) => {
                         if (!selectedRegion) return true;
                         const props = feature.properties || {};
-                        const dName = normalizeName(props.district_name);
-                        const bName = normalizeName(props.block_name);
                         const target = normalizeName(selectedRegion);
-                        // In district view, we show all. In block view, we show blocks of a district.
-                        // So if we are at block level (geojson has blocks), we check if feature's district matches selectedRegion.
+                        
+                        // Flexible detection of administrative properties
+                        const dVal = getVal(props, ['district']);
+                        const bVal = getVal(props, ['block']);
+                        
+                        const dName = normalizeName(dVal);
+                        const bName = normalizeName(bVal);
+                        
                         return dName === target || bName === target;
                     },
                 onEachFeature: (feature, layer) => {
-                    const name = feature.properties?.block_name || feature.properties?.district_name || "Region";
+                    const props = feature.properties || {};
+                    const name = getVal(props, ['block']) || getVal(props, ['district']) || "Region";
                     layer.bindTooltip(`<div class="font-sans text-[10px] font-bold p-1">${name}</div>`, { sticky: true });
                     layer.on({
                         click: (e) => {

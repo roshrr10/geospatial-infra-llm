@@ -10,7 +10,7 @@ interface AnalyticsDrawerProps {
     isOpen: boolean;
     onClose: () => void;
     title: string;
-    summary?: string;
+    summary?: any;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -201,19 +201,20 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
         if (v === '' || v === 'n/a' || v === 'null' || v === 'nan') return false;
 
         if (target === 'yes') {
-            return val === 1 || val === 1.0 || v === '1' || v === '1.0' || ['yes', 'true', 'functional', 'satisfactory', 'available', 'provided'].includes(v);
+            return val === 1 || val === 1.0 || v === '1' || v === '1.0' || ['yes', 'true', 'functional', 'satisfactory', 'available', 'provided', 'both'].includes(v);
         }
         if (target === 'no') {
-            return val === 0 || val === 0.0 || v === '0' || v === '0.0' || ['no', 'false', 'not functional', 'unavailable', 'none'].includes(v);
+            return val === 0 || val === 0.0 || v === '0' || v === '0.0' || ['no', 'false', 'not functional', 'unavailable', 'none', 'neither'].includes(v);
         }
         if (target === 'issue') {
-            return val === 2 || val === 2.0 || v === '2' || v.includes('issue') || v.includes('partial') || v.includes('repair');
+            return val === 2 || val === 2.0 || v === '2' || v.includes('issue') || v.includes('partial') || v.includes('repair') || v.includes('only');
         }
         return false;
     };
 
-    // Detect if the primary metric is binary (0, 1, 2 or Yes/No)
-    const primaryKey = numericKeys[0] || labelKey; // Fallback to labelKey if no numeric metric found
+    // Detect if the primary metric is binary (0, 1, 2 or Yes/No) 
+    // PREFER 'status' column if it exists for Venn logic
+    const primaryKey = keys.find(k => k.toLowerCase() === 'status' || k.toLowerCase() === 'combined_status') || numericKeys[0] || labelKey;
     const isBinaryField = primaryKey && (
         primaryKey.toLowerCase().includes('solar') ||
         primaryKey.toLowerCase().includes('panel') ||

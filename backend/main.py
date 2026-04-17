@@ -1,6 +1,7 @@
 import time
 import logging
 import asyncio
+from typing import List, Optional, Any
 from dotenv import load_dotenv
 load_dotenv() # Load env vars from .env file
 
@@ -55,7 +56,7 @@ class ReportRequest(BaseModel):
     metric: str
     level: str = "district"
     data: list
-    summary: str = None
+    summary: Any = None
 
 class EmailRequest(BaseModel):
     email: str
