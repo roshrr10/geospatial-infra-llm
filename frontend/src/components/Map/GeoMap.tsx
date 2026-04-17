@@ -338,15 +338,19 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         }
 
         // 2. BASMAP LAYER (Polygons)
+        let baseRenderHandle: any;
+        let heatRenderHandle: any;
+
         if (basemapLayerRef.current) {
             map.removeLayer(basemapLayerRef.current);
             basemapLayerRef.current = null;
         }
 
         if (basemap && viewMode !== 'heatmap') {
-            basemapLayerRef.current = L.geoJSON(basemap, {
-                pane: 'polygons',
-                style: getChoroplethStyle,
+            baseRenderHandle = setTimeout(() => {
+                basemapLayerRef.current = L.geoJSON(basemap, {
+                    pane: 'polygons',
+                    style: getChoroplethStyle,
                 onEachFeature: (feature, layer) => {
                     const name = feature.properties?.block_name || feature.properties?.district_name || "Region";
                     layer.bindTooltip(`<div class="font-sans text-[10px] font-bold p-1">${name}</div>`, { sticky: true });
@@ -361,8 +365,9 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                         }
                     }
                 });
-            }
-        }).addTo(map);
+                }
+            }).addTo(map);
+            }, 10);
         }
 
         // The GEOJSON LAYER (Dots) has been extracted to a separate atomic useEffect below.
@@ -370,8 +375,10 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
         // --- HEATMAP LAYER ---
         if (viewMode === "heatmap" && heatmapData?.length) {
             if (heatLayerRef.current) map.removeLayer(heatLayerRef.current);
-            // @ts-ignore
-            heatLayerRef.current = (L as any).heatLayer(heatmapData, { radius: 25, blur: 15, max: 0.8 }).addTo(map);
+            heatRenderHandle = setTimeout(() => {
+                // @ts-ignore
+                heatLayerRef.current = (L as any).heatLayer(heatmapData, { radius: 25, blur: 15, max: 0.8 }).addTo(map);
+            }, 10);
         } else if (heatLayerRef.current) {
             map.removeLayer(heatLayerRef.current);
             heatLayerRef.current = null;
@@ -399,6 +406,11 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             };
         }
         setLegendConfig(newLegendConfig);
+        
+        return () => {
+            clearTimeout(baseRenderHandle);
+            clearTimeout(heatRenderHandle);
+        };
 
     }, [basemap, currentLevel, heatmapData, viewMode, activeMetric, gradientMetric, metricMin, metricMax, relevantInfraCols, queryMode, geojson]);
 
