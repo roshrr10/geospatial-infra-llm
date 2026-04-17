@@ -9,6 +9,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.units import inch
 import io
 import datetime
+import matplotlib
+matplotlib.use('Agg') # Non-interactive backend
+import matplotlib.pyplot as plt
 
 def _find_best_metric(data: list, requested_metric: str) -> str:
     if not data:
@@ -54,6 +57,56 @@ def _find_best_metric(data: list, requested_metric: str) -> str:
     active_numeric_keys.sort(key=score_metric, reverse=True)
     return active_numeric_keys[0]
 
+def _generate_pie_chart(yes: int, no: int, issue: int, labels: list) -> io.BytesIO:
+    """Generates a Pie Chart for overall status breakdown."""
+    fig, ax = plt.subplots(figsize=(4, 3))
+    data = []
+    plot_labels = []
+    colors_list = []
+    
+    if yes > 0: data.append(yes); plot_labels.append(labels[0]); colors_list.append('#10b981')
+    if issue > 0: data.append(issue); plot_labels.append(labels[2]); colors_list.append('#f59e0b')
+    if no > 0: data.append(no); plot_labels.append(labels[1]); colors_list.append('#ef4444')
+    
+    if not data: return None
+    
+    ax.pie(data, labels=plot_labels, autopct='%1.1f%%', startangle=140, colors=colors_list, textprops={'fontsize': 8})
+    ax.set_title("Overall Compliance Breakdown", fontsize=10, pad=10)
+    
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    img_buffer.seek(0)
+    return img_buffer
+
+def _generate_bar_chart(dist_data: dict) -> io.BytesIO:
+    """Generates a Bar Chart for Top 10 impacted districts."""
+    if not dist_data: return None
+    
+    # Sort and take top 10 by missing count
+    sorted_dists = sorted(dist_data.items(), key=lambda x: x[1]['missing'], reverse=True)[:10]
+    names = [d[0] for d in sorted_dists]
+    counts = [d[1]['missing'] for d in sorted_dists]
+    
+    fig, ax = plt.subplots(figsize=(6, 3))
+    bars = ax.bar(names, counts, color='#3b82f6')
+    ax.set_title("Top 10 Districts by Missing Infrastructure", fontsize=10, pad=10)
+    ax.set_ylabel("Number of Schools", fontsize=8)
+    plt.xticks(rotation=45, ha='right', fontsize=7)
+    plt.yticks(fontsize=7)
+    
+    # Add labels on top of bars
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                f'{int(height)}', ha='center', va='bottom', fontsize=7)
+    
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    img_buffer.seek(0)
+    return img_buffer
+
 def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.BytesIO:
     """
     Generates a PDF report for the current data selection.
@@ -96,8 +149,10 @@ def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.Byte
 
     # 2. Executive Summary (AI Insights)
     if summary:
+        # Clean summary of Markdown artifacts (##, *, **)
+        clean_summary = summary.replace('###', '').replace('##', '').replace('**', '').replace('*', '').strip()
         elements.append(Paragraph("Executive Insights", header_style))
-        elements.append(Paragraph(summary, styles['Normal']))
+        elements.append(Paragraph(clean_summary.replace('\n', '<br/>'), styles['Normal']))
         elements.append(Spacer(1, 0.3 * inch))
 
     # Detect all relevant infrastructure columns in the current dataset
@@ -181,7 +236,15 @@ def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.Byte
             summary_text += f"<b>{issue_label}:</b> {issue_count} ({round(issue_count/total*100, 1) if total > 0 else 0}%)"
             
         elements.append(Paragraph(summary_text, styles['Normal']))
-        elements.append(Spacer(1, 0.3 * inch))
+        
+        # --- GENERATE AND ADD PIE CHART ---
+        labels = [label, neg_label, issue_label]
+        pie_buf = _generate_pie_chart(yes_count, no_count, issue_count, labels)
+        if pie_buf:
+            elements.append(Image(pie_buf, width=3.5*inch, height=2.6*inch))
+            elements.append(Spacer(1, 0.3 * inch))
+        else:
+            elements.append(Spacer(1, 0.3 * inch))
 
         # 2a. District Summary Table
         elements.append(Paragraph("District-Level Performance Summary", header_style))
@@ -212,7 +275,15 @@ def generate_pdf_report(metric: str, data: list, summary: str = None) -> io.Byte
             ('BACKGROUND', (0, 1), (-1, -1), colors.white),
         ]))
         elements.append(dt)
-        elements.append(Spacer(1, 0.3 * inch))
+        
+        # --- GENERATE AND ADD BAR CHART ---
+        bar_buf = _generate_bar_chart(dist_data)
+        if bar_buf:
+            elements.append(Spacer(1, 0.2 * inch))
+            elements.append(Image(bar_buf, width=5.5*inch, height=2.7*inch))
+            elements.append(Spacer(1, 0.3 * inch))
+        else:
+            elements.append(Spacer(1, 0.3 * inch))
 
         # 2b. Block Summary Table
         elements.append(Paragraph("Top 10 High-Impact Blocks", header_style))

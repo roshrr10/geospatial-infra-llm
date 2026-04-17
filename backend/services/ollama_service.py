@@ -487,9 +487,10 @@ Context: Analyzed {total_analyzed} schools for gaps in {', '.join(target_cols)}.
 - Met all criteria: {joint_met}
 
 Rules:
-1. Start with "### Analytics Summary"
-2. Keep it short, crisp, and clear.
-3. Provide exactly 3 small and important bullet points pulling from the data. Do NOT write paragraphs. Maximum 2 sentences per point.
+1. Do NOT use any Markdown characters like #, ##, *, **, or _.
+2. Provide exactly 3 small and important points in a numbered list format: 1., 2., 3.
+3. Keep it short, crisp, and clear. Maximum 2 sentences per point.
+4. Start directly with the first point.
 
 Output:
 """
