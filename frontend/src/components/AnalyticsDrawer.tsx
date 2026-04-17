@@ -243,8 +243,19 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
 
     // Detect entity type from the data
     const multiBinaryKeys = numericKeys.filter(k => k !== 'All Selected Facilities' && data.slice(0, 100).every(d => checkVal(d[k], 'yes') || checkVal(d[k], 'no') || checkVal(d[k], 'issue') || d[k] == null));
-    const isMultiBinaryMode = multiBinaryKeys.length >= 2;
-    
+    const getCleanLabel = (k: string) => {
+        if (!k) return '';
+        return k.replace(/no_of_/gi, '')
+            .replace(/smart_classroom_available_in_school_1_yes_2_no/gi, 'Smart Classroom')
+            .replace(/_available/gi, '')
+            .replace(/_provided/gi, '')
+            .replace(/_/g, ' ')
+            .trim()
+            .split(' ')
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+    };
+
     const vennStats = (isMultiBinaryMode && multiBinaryKeys.length === 2) ? (() => {
         const s1 = multiBinaryKeys[0];
         const s2 = multiBinaryKeys[1];
@@ -260,8 +271,8 @@ export default function AnalyticsDrawer({ data, isOpen, onClose, title, summary 
         });
         
         return {
-            s1Name: s1.split('_')[0].charAt(0).toUpperCase() + s1.split('_')[0].slice(1),
-            s2Name: s2.split('_')[0].charAt(0).toUpperCase() + s2.split('_')[0].slice(1),
+            s1Name: getCleanLabel(s1),
+            s2Name: getCleanLabel(s2),
             both, onlyX, onlyY, neither
         };
     })() : null;

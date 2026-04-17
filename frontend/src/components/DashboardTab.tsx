@@ -121,6 +121,20 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
     const isMultiBinaryMode = binaryCols.length === 2;
     const multiStats: any[] = [];
     
+    // Helper for cleaning metric names
+    const getCleanLabel = (k: string) => {
+        if (!k) return '';
+        return k.replace(/no_of_/gi, '')
+            .replace(/smart_classroom_available_in_school_1_yes_2_no/gi, 'Smart Classroom')
+            .replace(/_available/gi, '')
+            .replace(/_provided/gi, '')
+            .replace(/_/g, ' ')
+            .trim()
+            .split(' ')
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+    };
+
     if (isMultiBinaryMode) {
         const s1 = binaryCols[0];
         const s2 = binaryCols[1];
@@ -157,8 +171,8 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
 
         multiStats.push(
             { name: 'Both', value: both, color: '#10b981', label: 'Joint Compliance' },
-            { name: s1.split('_')[0].charAt(0).toUpperCase() + s1.split('_')[0].slice(1), value: onlyX, color: '#3b82f6', label: `${s1.split('_')[0]} only` },
-            { name: s2.split('_')[0].charAt(0).toUpperCase() + s2.split('_')[0].slice(1), value: onlyY, color: '#f59e0b', label: `${s2.split('_')[0]} only` },
+            { name: getCleanLabel(s1), value: onlyX, color: '#3b82f6', label: `${getCleanLabel(s1)} only` },
+            { name: getCleanLabel(s2), value: onlyY, color: '#f59e0b', label: `${getCleanLabel(s2)} only` },
             { name: 'None', value: neither, color: '#ef4444', label: 'No Facility' }
         );
 

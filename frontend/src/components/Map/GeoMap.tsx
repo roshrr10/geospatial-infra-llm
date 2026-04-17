@@ -110,6 +110,19 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             .trim();
     };
 
+    const getCleanLabel = (k: string) => {
+        if (!k) return '';
+        return k.replace(/no_of_/gi, '')
+            .replace(/smart_classroom_available_in_school_1_yes_2_no/gi, 'Smart Classroom')
+            .replace(/_available/gi, '')
+            .replace(/_provided/gi, '')
+            .replace(/_/g, ' ')
+            .trim()
+            .split(' ')
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+    };
+
     // --- DATA & INFRASTRUCTURE DETECTION ---
     const { 
         relevantInfraCols, 
@@ -403,22 +416,33 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
 
         // --- LEGEND AND MODE FINALIZATION ---
         let newLegendConfig = null;
+
         const hasData = geojson || (apiResult?.table && apiResult.table.length > 0);
 
         if (hasData && queryMode === 'metric' && gradientMetric) {
             newLegendConfig = { type: 'gradient', metricLabel: gradientMetric.replace(/_/g, ' ').toUpperCase(), min: metricMin, max: metricMax };
-        } else if (hasData && (queryMode === 'multi_binary' || queryMode === 'single_binary')) {
-            const label = queryMode === 'multi_binary' 
-                ? `Criteria: ${relevantInfraCols.map(k => k.replace(/_/g, ' ').replace(/\bno of\b/gi, '')).join(" & ").toUpperCase()}`
-                : (activeMetric || relevantInfraCols[0] || "Infrastructure").replace(/_/g, ' ').toUpperCase();
-
+        } else if (hasData && queryMode === 'multi_binary' && relevantInfraCols.length >= 2) {
+            const s1Name = getCleanLabel(relevantInfraCols[0]);
+            const s2Name = getCleanLabel(relevantInfraCols[1]);
+            
             newLegendConfig = { 
                 type: 'binary', 
-                metricLabel: label, 
+                metricLabel: `Comparative: ${s1Name} & ${s2Name}`, 
                 items: [
-                    { label: queryMode === 'multi_binary' ? 'All Criteria Met' : 'Met / Available', color: '#10b981' },
-                    { label: queryMode === 'multi_binary' ? 'Partial / Issue' : 'Issue / Partial', color: '#f59e0b' },
-                    { label: queryMode === 'multi_binary' ? 'None Met' : 'Missing / No', color: '#ef4444' }
+                    { label: 'Both Equipped', color: '#10b981' },
+                    { label: `Only ${s1Name}`, color: '#3b82f6' },
+                    { label: `Only ${s2Name}`, color: '#f59e0b' },
+                    { label: 'None (Neither)', color: '#ef4444' }
+                ]
+            };
+        } else if (hasData && queryMode === 'single_binary') {
+            newLegendConfig = { 
+                type: 'binary', 
+                metricLabel: (activeMetric || relevantInfraCols[0] || "Infrastructure").replace(/_/g, ' ').toUpperCase(), 
+                items: [
+                    { label: 'Met / Available', color: '#10b981' },
+                    { label: 'Issue / Partial', color: '#f59e0b' },
+                    { label: 'Missing / No', color: '#ef4444' }
                 ]
             };
         }
@@ -547,8 +571,8 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                             if (m === 'yes') label = queryMode === 'multi_binary' ? 'Both' : 'Met';
                             else if (m === 'no') label = 'None';
                             else if (m === 'issue') label = 'Partial';
-                            else if (m === 'only_x') label = relevantInfraCols[0]?.split('_')[0].charAt(0).toUpperCase() + relevantInfraCols[0]?.split('_')[0].slice(1) || 'Metric 1';
-                            else if (m === 'only_y') label = relevantInfraCols[1]?.split('_')[0].charAt(0).toUpperCase() + relevantInfraCols[1]?.split('_')[0].slice(1) || 'Metric 2';
+                            else if (m === 'only_x') label = getCleanLabel(relevantInfraCols[0]) || 'Metric 1';
+                            else if (m === 'only_y') label = getCleanLabel(relevantInfraCols[1]) || 'Metric 2';
                             
                             return (
                                 <button key={m} onClick={() => setFilterMode(m as any)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === m ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}>
