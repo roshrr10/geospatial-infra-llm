@@ -161,24 +161,24 @@ async def handle_compare(level: str, name1: str, name2: str):
 
 
 @app.get("/heatmap")
-def handle_heatmap(metric: str = "priority_score", level: str = "block"):
+def handle_heatmap(metric: str = "priority_score", level: str = "block", intent: str = "all"):
     try:
-        return get_heatmap_data(metric, level)
+        return get_heatmap_data(metric, level, intent)
     except Exception as e:
         logger.error(f"Heatmap Data Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/heatmap/summary")
-async def handle_heatmap_summary(metric: str = "priority_score", level: str = "block"):
+async def handle_heatmap_summary(metric: str = "priority_score", level: str = "block", intent: str = "all"):
     try:
         # Heatmap summary needs some basic data stats
-        data = get_heatmap_data(metric, level)
+        data = get_heatmap_data(metric, level, intent)
         # We only pass a sample or aggregated stats to LLM to avoid token limits
         sample_data = data.get("features", [])[:100]
         # Map to flat list for LLM
         flat_data = [f["properties"] for f in sample_data]
-        summary = await get_heatmap_summary(metric, level, flat_data)
+        summary = await get_heatmap_summary(metric, level, flat_data, intent)
         return {"summary": summary}
     except Exception as e:
         logger.error(f"Heatmap Summary Error: {str(e)}")

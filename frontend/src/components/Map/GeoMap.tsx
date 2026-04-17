@@ -274,6 +274,14 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             const schoolsPane = mapRef.current.createPane('schools');
             schoolsPane.style.zIndex = '500';
             schoolsPane.style.pointerEvents = 'auto'; // Interactive dots
+
+            // Fetch and draw State Border
+            fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/basemap?level=state`, {
+                headers: { "ngrok-skip-browser-warning": "true" }
+            })
+                .then(res => res.json())
+                .then(data => L.geoJSON(data, { style: { color: "#1e293b", weight: 3, fillOpacity: 0, interactive: false } }).addTo(mapRef.current!))
+                .catch(err => console.error("State border load error", err));
         }
 
         const map = mapRef.current;
@@ -414,12 +422,39 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
             }, 10);
         }
 
+        if (heatmapData && viewMode === 'heatmap') {
+            heatRenderHandle = setTimeout(() => {
+                if (heatLayerRef.current) {
+                    map.removeLayer(heatLayerRef.current);
+                }
+                // @ts-ignore
+                heatLayerRef.current = L.heatLayer(heatmapData, {
+                    radius: currentLevel === 'district' ? 35 : (currentLevel === 'block' ? 25 : 15),
+                    blur: 15,
+                    maxZoom: 17,
+                    max: 1.0,
+                    gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red' }
+                }).addTo(map);
+            }, 50);
+        } else if (heatLayerRef.current) {
+            map.removeLayer(heatLayerRef.current);
+            heatLayerRef.current = null;
+        }
+
         // --- LEGEND AND MODE FINALIZATION ---
         let newLegendConfig = null;
 
-        const hasData = geojson || (apiResult?.table && apiResult.table.length > 0);
+        const hasData = geojson || (apiResult?.table && apiResult.table.length > 0) || (heatmapData && heatmapData.length > 0);
 
-        if (hasData && queryMode === 'metric' && gradientMetric) {
+        if (viewMode === 'heatmap') {
+            const label = activeMetric ? getCleanLabel(activeMetric) : "Intensity";
+            newLegendConfig = { 
+                type: 'heatmap', 
+                metricLabel: `${label} Concentration`, 
+                min: 0, 
+                max: 1 
+            };
+        } else if (hasData && queryMode === 'metric' && gradientMetric) {
             newLegendConfig = { type: 'gradient', metricLabel: gradientMetric.replace(/_/g, ' ').toUpperCase(), min: metricMin, max: metricMax };
         } else if (hasData && queryMode === 'multi_binary' && relevantInfraCols.length >= 2) {
             const s1Name = getCleanLabel(relevantInfraCols[0]);
@@ -612,6 +647,14 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                                 <span>High ({legendConfig.max.toLocaleString()})</span>
                             </div>
                         </>
+                    ) : legendConfig.type === 'heatmap' ? (
+                        <>
+                            <div className="h-3 w-full rounded-full" style={{ background: 'linear-gradient(to right, blue, cyan, lime, yellow, red)' }} />
+                            <div className="flex justify-between text-[9px] font-bold text-slate-500 mt-1">
+                                <span>Low Concentration</span>
+                                <span>High Intensity</span>
+                            </div>
+                        </>
                     ) : (
                         <div className="flex flex-col gap-1.5 mt-2">
                             {legendConfig.items.map((it: any, i: number) => (
@@ -624,20 +667,6 @@ export default function GeoMap({ geojson, basemap, currentLevel, onLevelChange, 
                     )}
                 </div>
             )}
-            <StateBorder map={mapRef.current} />
         </div>
     );
-}
-
-function StateBorder({ map }: { map: L.Map | null }) {
-    useEffect(() => {
-        if (!map) return;
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/basemap?level=state`, {
-            headers: { "ngrok-skip-browser-warning": "true" }
-        })
-            .then(res => res.json())
-            .then(data => L.geoJSON(data, { style: { color: "#1e293b", weight: 3, fillOpacity: 0, interactive: false } }).addTo(map))
-            .catch(err => console.error("State border load error", err));
-    }, [map]);
-    return null;
 }

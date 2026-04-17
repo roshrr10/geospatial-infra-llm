@@ -590,7 +590,7 @@ async def get_summary_from_llm(question: str, data: list):
             "recommendations": ["Manual infrastructure audit recommended."]
         }
 
-async def get_heatmap_summary(metric: str, level: str, data: list):
+async def get_heatmap_summary(metric: str, level: str, data: list, intent: str = "all"):
     """
     Generates a summary for heatmap visualizations using aggregated trends.
     """
@@ -598,19 +598,28 @@ async def get_heatmap_summary(metric: str, level: str, data: list):
         return "No intensity data available for the selected metric."
 
     total = len(data)
-    avg_score = sum(d.get('priority_score', 0) for d in data) / total if total > 0 else 0
-    top_regions = sorted(data, key=lambda x: x.get('priority_score', 0), reverse=True)[:3]
-    region_names = ", ".join([d.get('district_name') or d.get('block_name') or 'N/A' for d in top_regions])
+    # The spatial_service now sends flat_data populated with 'intensity' and 'region_name'
+    avg_score = sum(d.get('intensity', 0) for d in data) / total if total > 0 else 0
+    top_regions = sorted(data, key=lambda x: x.get('intensity', 0), reverse=True)[:3]
+    region_names = ", ".join(list(set([d.get('region_name', 'Unknown') for d in top_regions])))
+    
+    # Calculate school concentration info to satisfy the 'school numbers' narrative
+    high_intensity_count = len([d for d in data if d.get('intensity', 0) > 0.5])
+    
+    metric_label = metric.replace('_', ' ')
+    if intent == 'no':
+        metric_label = f"Missing/Absence of {metric_label}"
 
     prompt = f"""
-System: You are a GeoAI Analyst. Summarize the spatial pattern of {metric.replace('_', ' ')} intensity in Meghalaya.
-Avoid technical jargon. Focus on which areas are most affected.
+System: You are a GeoAI Analyst. Summarize the spatial pattern of {metric_label} intensity in Meghalaya.
+Avoid technical jargon. Note that darker red areas on the heatmap represent higher concentration/numbers. 
 
 Context:
-- Metric: {metric}
-- Level: {level}
-- Average Priority Score: {round(avg_score, 2)}
-- Top Impacted Areas: {region_names}
+- Target Metric: {metric_label}
+- Granularity Level: {level}
+- Average Heatmap Intensity (0-1): {round(avg_score, 2)}
+- Top Impacted/Concentrated Areas: {region_names}
+- Regions with high density of schools/facilities: {high_intensity_count} out of {total} total points mapped.
 
 Summary (2 sentences):"""
 

@@ -113,9 +113,9 @@ export default function Dashboard() {
       .catch(err => console.error("Basemap fetch failed", err));
   }, []);
 
-  const fetchHeatmap = useCallback(async (metric: string, level: string) => {
+  const fetchHeatmap = useCallback(async (metric: string, level: string, filterIntent: string) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap?metric=${metric}&level=${level}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap?metric=${metric}&level=${level}&intent=${filterIntent}`, {
         headers: { "ngrok-skip-browser-warning": "true" }
       });
       const data = await response.json();
@@ -132,7 +132,7 @@ export default function Dashboard() {
     }
   }, []);
 
-  const fetchHeatmapSummary = useCallback(async (metric: string, level: string) => {
+  const fetchHeatmapSummary = useCallback(async (metric: string, level: string, filterIntent: string) => {
     try {
       setApiResult((prev: any) => ({
         ...prev,
@@ -140,7 +140,7 @@ export default function Dashboard() {
         table: prev?.table || []
       }));
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap/summary?metric=${metric}&level=${level}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/heatmap/summary?metric=${metric}&level=${level}&intent=${filterIntent}`, {
         headers: { "ngrok-skip-browser-warning": "true" }
       });
       const data = await response.json();
@@ -163,12 +163,12 @@ export default function Dashboard() {
   useEffect(() => {
     if (viewMode === "heatmap") {
       const level = mapLevel === "school" ? "block" : mapLevel;
-      fetchHeatmap(activeMetric, level);
-      fetchHeatmapSummary(activeMetric, level);
+      fetchHeatmap(activeMetric, mapLevel, mapFilterIntent);
+      fetchHeatmapSummary(activeMetric, mapLevel, mapFilterIntent);
     } else {
       setHeatmapData(undefined);
     }
-  }, [activeMetric, viewMode, mapLevel, fetchHeatmap, fetchHeatmapSummary]);
+  }, [activeMetric, viewMode, mapLevel, mapFilterIntent, fetchHeatmap, fetchHeatmapSummary]);
 
   const processSearch = useCallback(async (q: string) => {
     setIsSearching(true);

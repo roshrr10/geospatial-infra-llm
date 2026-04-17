@@ -635,47 +635,111 @@ def get_comparison_data(level: str, name1: str, name2: str):
         raise e
 
 
-def get_heatmap_data(metric: str, level: str):
+def get_heatmap_data(metric: str, level: str, intent: str = "all"):
     """Generates intensity points for heatmap based on school counts or specific metrics."""
-    if level == "school": # Not usually used but for completeness
-        level = "block"
-        
     # Standardize metric to DB column
     facility_map = {
-        'priority_score': 'priority_score',
+        'priority_score': 'avg_school_density', # Use school density as proxy for priority
+        'avg_school_density': 'avg_school_density',
+        'avg_road_density': 'avg_road_density',
+        'road_density_km_per_sqkm': 'road_density_km_per_sqkm',
+        'schools_per_sqkm': 'schools_per_sqkm',
+        'total_schools': 'total_schools',
         'electricity': 'electricity_connection_available',
         'drinking_water': 'drinking_water_availability',
+        'water': 'drinking_water_availability',
         'library': 'library_facility',
         'computers': 'no_of_computer',
+        'computer': 'no_of_computer',
+        'playground': 'playground_available',
         'ramp': 'ramp_available',
         'smart_classroom': 'smart_classroom_available_in_school_1_yes_2_no',
+        'internet': 'internet_facility_available_in_school_1_yes_2_no',
+        'toilet': 'boy_toilet_available',
+        'attainment': 'attainment' # Special flag for multi-metric
     }
-    col = facility_map.get(metric, metric)
     
-    # If it's a count/density metric, we join with intelligence tables
-    if col in ['total_schools', 'schools_per_sqkm', 'avg_road_density', 'avg_school_density']:
+    # Check for multi-metric (attainment) or comma-separated list
+    metrics = [m.strip() for m in metric.split(',')]
+    cols = [facility_map.get(m.lower(), m) for m in metrics]
+    
+    # Intelligence Metrics (Aggregated)
+    intel_metrics = [
+        'total_schools', 'schools_per_sqkm', 'avg_road_density', 'avg_school_density', 
+        'road_density_km_per_sqkm', 'priority_score', 'block_area_sqkm',
+        'avg_ifa_coverage_girls', 'avg_deworm_coverage_girls'
+    ]
+    
+    is_intel = any(c in intel_metrics for c in cols)
+    
+    if is_intel and level != "school":
         table = "meghalaya_district_intelligence_final" if level == "district" else "meghalaya_block_intelligence_final"
-        sql = f"SELECT {col} as intensity, ST_AsGeoJSON(ST_Centroid(geometry)) as geometry FROM {table}"
-    else:
-        # For infrastructure metrics at school level intensity
-        # Intensity = 1 if Met, 0 if not Met. Centered on schools.
-        sql = f"""
-            SELECT i.{col} as intensity, ST_AsGeoJSON(s.geometry) as geometry
-            FROM meghalaya_schools s
-            JOIN meghalaya_infrastructure i ON LEFT(s."udiseCode"::text, 11) = LEFT(i.udise_code::text, 11)
-            WHERE i.{col} IS NOT NULL
-        """
+        col = cols[0]
+        # Safety for level mismatches (e.g. road_density_km_per_sqkm is block-only)
+        if col == 'road_density_km_per_sqkm' and level == 'district': col = 'avg_road_density'
+        if col == 'avg_road_density' and level == 'block': col = 'road_density_km_per_sqkm'
+        if col == 'priority_score': col = 'avg_school_density' if level == 'district' else 'schools_per_sqkm'
+        if col == 'avg_school_density' and level == 'block': col = 'schools_per_sqkm'
+        if col == 'schools_per_sqkm' and level == 'district': col = 'avg_school_density'
         
+        name_col = 'district_name' if level == 'district' else 'block_name'
+        sql = f"SELECT {col} as intensity, {name_col} as region_name, ST_AsGeoJSON(ST_Centroid(geometry)) as geometry FROM {table}"
+    else:
+        # Infrastructure Metrics (School Level)
+        # If attainment/multiple metrics, we look for both met
+        if len(cols) > 1 or 'attainment' in cols:
+            # Detect actual infra columns from table to find the two metrics
+            m1 = 'no_of_computer'
+            m2 = 'smart_classroom_available_in_school_1_yes_2_no'
+            # If we have specific cols, use them
+            if len(cols) >= 2:
+                m1, m2 = cols[0], cols[1]
+                if m1 == 'attainment': m1 = 'no_of_computer'
+                if m2 == 'attainment': m2 = 'smart_classroom_available_in_school_1_yes_2_no'
+            
+            if intent == 'no':
+                c1_check = f"(i.{m1}::text = '0' OR i.{m1}::text ILIKE 'no' OR i.{m1} IS NULL)"
+                c2_check = f"(i.{m2}::text = '0' OR i.{m2}::text ILIKE 'no' OR i.{m2} IS NULL)"
+                logic = f"{c1_check} AND {c2_check}"
+            else:
+                c1_check = f"(i.{m1}::text > '0' OR i.{m1}::text = '1' OR i.{m1}::text ILIKE 'yes')"
+                c2_check = f"(i.{m2}::text = '1' OR i.{m2}::text ILIKE 'yes')"
+                logic = f"{c1_check} AND {c2_check}"
+
+            sql = f"""
+                SELECT (CASE WHEN {logic} THEN 1 ELSE 0 END) as intensity, 
+                       s.district_name as region_name,
+                       ST_AsGeoJSON(s.geometry) as geometry
+                FROM meghalaya_schools s
+                JOIN meghalaya_infrastructure i ON LEFT(s."udiseCode"::text, 11) = LEFT(i.udise_code::text, 11)
+            """
+        else:
+            col = cols[0]
+            # Handle numeric vs binary with safe type casting (::text)
+            if intent == 'no':
+                val_check = f"i.{col}::text = '0' OR i.{col}::text ILIKE 'no' OR i.{col} IS NULL"
+            else:
+                val_check = f"i.{col}::text > '0' OR i.{col}::text = '1' OR i.{col}::text ILIKE 'yes'" if col == 'no_of_computer' else f"i.{col}::text = '1' OR i.{col}::text ILIKE 'yes'"
+                
+            sql = f"""
+                SELECT (CASE WHEN {val_check} THEN 1 ELSE 0 END) as intensity, s.district_name as region_name, ST_AsGeoJSON(s.geometry) as geometry
+                FROM meghalaya_schools s
+                JOIN meghalaya_infrastructure i ON LEFT(s."udiseCode"::text, 11) = LEFT(i.udise_code::text, 11)
+                WHERE i.{col} IS NOT NULL OR '{intent}' = 'no'
+            """
+            
     try:
-        import geopandas as gpd
+        import pandas as pd
+        import json
         with engine.connect() as conn:
             df = pd.read_sql(text(sql), conn)
             
         if df.empty:
             return {"type": "FeatureCollection", "features": []}
             
-        # Normalize intensity to 0-1 if it's not already
+        # Normalize intensity to 0-1
         if not df['intensity'].empty:
+            df['intensity'] = pd.to_numeric(df['intensity'], errors='coerce').fillna(0)
             imax = df['intensity'].max()
             imin = df['intensity'].min()
             if imax > imin:
@@ -685,11 +749,15 @@ def get_heatmap_data(metric: str, level: str):
 
         features = []
         for _, row in df.iterrows():
-            features.append({
-                "type": "Feature",
-                "geometry": json.loads(row['geometry']),
-                "properties": {"intensity": float(row['intensity'])}
-            })
+            if row['geometry']:
+                features.append({
+                    "type": "Feature",
+                    "geometry": json.loads(row['geometry']),
+                    "properties": {
+                        "intensity": float(row['intensity']),
+                        "region_name": str(row.get('region_name', 'Unknown'))
+                    }
+                })
             
         return {"type": "FeatureCollection", "features": features}
     except Exception as e:
