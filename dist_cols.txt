@@ -1,8 +1,0 @@
-district_name
-geometry
-avg_road_density
-avg_school_density
-avg_ifa_coverage_girls
-avg_ifa_coverage_boys
-avg_deworm_coverage_girls
-avg_deworm_coverage_boys
