@@ -8,7 +8,7 @@ from sqlalchemy import text
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from backend.database.db import engine
 
-CSV_PATH = r"c:\ROSH\DeepSpatial\geospatial-infra-llm\infrastructure.csv"
+CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "infrastructure.csv"))
 
 def clean_column_name(col):
     if not isinstance(col, str):

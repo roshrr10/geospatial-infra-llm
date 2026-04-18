@@ -1,7 +1,7 @@
 import os
 import re
-
-frontend_dir = r"c:\ROSH\DeepSpatial\geospatial-infra-llm\frontend\src"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+frontend_dir = os.path.join(script_dir, '..', 'frontend', 'src')
 
 for root, _, files in os.walk(frontend_dir):
     for file in files:

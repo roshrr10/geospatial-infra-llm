@@ -9,7 +9,7 @@ from tqdm import tqdm
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from backend.database.db import engine
 
-CSV_PATH = r"c:\ROSH\DeepSpatial\geospatial-infra-llm\data\raw\meghalaya\infra\MDM_Infra_Report.csv"
+CSV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "raw", "meghalaya", "infra", "MDM_Infra_Report.csv"))
 
 def clean_column_name(col):
     return col.strip().lower().replace(' ', '_').replace('.', '').replace('-', '_').replace('__', '_')
