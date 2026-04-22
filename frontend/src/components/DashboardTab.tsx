@@ -5,6 +5,7 @@ import {
   ScatterChart, Scatter, ZAxis
 } from 'recharts';
 import { LayoutDashboard, CheckCircle, AlertCircle, Info, Lightbulb, Sparkles, MapPin } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface DashboardTabProps {
   data: any[];
@@ -16,6 +17,7 @@ interface DashboardTabProps {
 const COLORS = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6'];
 
 export default function DashboardTab({ data, activeMetric, level, summary }: DashboardTabProps) {
+  const { t } = useLanguage();
   const { 
     summaryCards, 
     barData, 
@@ -98,9 +100,9 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
 
     // Charts preparation
     const statusData = [
-        { name: 'Equipped', value: positiveCount, color: '#10b981' },
-        { name: 'Missing', value: negativeCount, color: '#ef4444' },
-        { name: 'Issues', value: issueCount, color: '#f59e0b' }
+        { name: t('equipped'), value: positiveCount, color: '#10b981' },
+        { name: t('missing'), value: negativeCount, color: '#ef4444' },
+        { name: t('partialMet'), value: issueCount, color: '#f59e0b' }
     ];
 
     // Build Scatter Data for Correlation
@@ -165,10 +167,10 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
             });
 
             multiStats.push(
-                { name: 'Both', value: both, color: '#10b981', label: 'Joint Compliance' },
-                { name: getCleanLabel(s1), value: onlyX, color: '#3b82f6', label: `${getCleanLabel(s1)} only` },
-                { name: getCleanLabel(s2), value: onlyY, color: '#f59e0b', label: `${getCleanLabel(s2)} only` },
-                { name: 'None', value: neither, color: '#ef4444', label: 'No Facility' }
+                { name: t('allMet'), value: both, color: '#10b981', label: t('jointCompliance') },
+                { name: getCleanLabel(s1), value: onlyX, color: '#3b82f6', label: `${getCleanLabel(s1)}` },
+                { name: getCleanLabel(s2), value: onlyY, color: '#f59e0b', label: `${getCleanLabel(s2)}` },
+                { name: t('noneMet'), value: neither, color: '#ef4444', label: t('noneMet') }
             );
         } else {
             // 3+ Metrics Mode: Use Backend Categorization
@@ -177,13 +179,13 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
                 const sVal = safeStr(d[statusKey || 'status']);
                 if (sVal === 'all met') allMet++;
                 else if (sVal === 'partial met') partialMet++;
-                else noneMet++;
+                else if (sVal === 'none met') noneMet++;
             });
 
             multiStats.push(
-                { name: 'All Met', value: allMet, color: '#10b981', label: 'Full Compliance' },
-                { name: 'Partial', value: partialMet, color: '#3b82f6', label: 'Partial Infrastructure' },
-                { name: 'None Met', value: noneMet, color: '#ef4444', label: 'Critical Gap' }
+                { name: t('allMet'), value: allMet, color: '#10b981', label: t('allMet') },
+                { name: t('partialMet'), value: partialMet, color: '#f59e0b', label: t('partialMet') },
+                { name: t('noneMet'), value: noneMet, color: '#ef4444', label: t('noneMet') }
             );
         }
 

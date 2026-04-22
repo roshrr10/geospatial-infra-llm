@@ -52,10 +52,17 @@ We don't just dump raw files. We utilize a strong **ETL Pipeline** built into th
 We programmed robust guardrails into the LLM system prompts (`backend/services/ollama_service.py`) to handle complex queries safely.
 
 ### Special Logic We Guard Against:
-1. **Averting NULL values:**
+1. **Multi-Metric Scoring**: 
+   - When 2+ facilities are queried, the system calculates a **Composite Infrastructure Score (0-100)**.
+   - Automatically categorizes schools as **"All Met"**, **"Partial Met"**, or **"None Met"**.
+2. **Girls' Hygiene Audit**:
+   - Specialized mapping for sanitary vending machines, incinerators, and girls' toilets.
+3. **Condition Awareness**:
+   - Handles "functional issues" and "not working" queries by filtering for values `0` or `2`.
+4. **Geographic Guardrails**:
+   - Strictly focused on Meghalaya; prevents hallucination for non-local geographic queries.
+5. **Averting NULL values**:
    - The LLM forces conditions like `column IS NOT NULL AND column != ''` when looking for specific conditions.
-2. **Case Insensitivity:**
-   - Standardized `ILIKE` for string matches (e.g., `district ILIKE '%GARO HILLS%'`) instead of strict `=`.
 
 ---
 

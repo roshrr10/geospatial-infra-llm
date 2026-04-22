@@ -47,10 +47,12 @@ async def timing_middleware(request: Request, call_next):
 # ── Models ──
 class QueryRequest(BaseModel):
     question: str
+    language: Optional[str] = "en"
 
 class SummaryRequest(BaseModel):
     question: str
     data: list
+    language: Optional[str] = "en"
 
 class ReportRequest(BaseModel):
     metric: str
@@ -73,7 +75,7 @@ async def handle_query(request: QueryRequest):
     
     for attempt in range(max_retries):
         try:
-            sql, level = await get_sql_from_llm(request.question)
+            sql, level = await get_sql_from_llm(request.question, request.language)
             
             # Handle conversational/chat responses
             if level == "chat":
@@ -106,7 +108,7 @@ async def handle_query(request: QueryRequest):
 @app.post("/query/summary")
 async def handle_summary(request: SummaryRequest):
     try:
-        summary = await get_summary_from_llm(request.question, request.data)
+        summary = await get_summary_from_llm(request.question, request.data, request.language)
         return {"summary": summary}
     except Exception as e:
         import traceback
@@ -170,7 +172,7 @@ def handle_heatmap(metric: str = "priority_score", level: str = "block", intent:
 
 
 @app.get("/heatmap/summary")
-async def handle_heatmap_summary(metric: str = "priority_score", level: str = "block", intent: str = "all"):
+async def handle_heatmap_summary(metric: str = "priority_score", level: str = "block", intent: str = "all", language: str = "en"):
     try:
         # Heatmap summary needs some basic data stats
         data = get_heatmap_data(metric, level, intent)
@@ -178,7 +180,7 @@ async def handle_heatmap_summary(metric: str = "priority_score", level: str = "b
         sample_data = data.get("features", [])[:100]
         # Map to flat list for LLM
         flat_data = [f["properties"] for f in sample_data]
-        summary = await get_heatmap_summary(metric, level, flat_data, intent)
+        summary = await get_heatmap_summary(metric, level, flat_data, intent, language)
         return {"summary": summary}
     except Exception as e:
         logger.error(f"Heatmap Summary Error: {str(e)}")

@@ -4,6 +4,8 @@ import "./globals.css";
 import NgrokInterceptor from "@/components/NgrokInterceptor";
 
 
+import { LanguageProvider } from "@/context/LanguageContext";
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -19,8 +21,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <NgrokInterceptor />
-        {children}
+        <LanguageProvider>
+          <NgrokInterceptor />
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

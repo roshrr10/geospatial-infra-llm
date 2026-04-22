@@ -59,7 +59,7 @@ async def warm_up_model():
     except Exception as e:
         print(f"Warm up failed: {e}")
 
-async def get_sql_from_llm(question: str):
+async def get_sql_from_llm(question: str, language: str = "en"):
     # Check Cache
     cached = llm_cache.get(question)
     if cached:
@@ -477,9 +477,9 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
-async def get_summary_from_llm(question: str, data: list):
+async def get_summary_from_llm(question: str, data: list, language: str = "en"):
     """Refined AI Summary Engine: Provides deep insights with Government of Meghalaya persona."""
-    cache_key = f"summary_ai_{question}_{len(data)}"
+    cache_key = f"summary_ai_{question}_{len(data)}_{language}"
     cached = summary_cache.get(cache_key)
     if cached: return cached
 
@@ -546,8 +546,15 @@ async def get_summary_from_llm(question: str, data: list):
             sc += f"\nOverlap Analysis (Venn-Logic):\n- Both {target_cols[0]} AND {target_cols[1]}: {total_both}\n- ONLY {target_cols[0]}: {total_only_x}\n- ONLY {target_cols[1]}: {total_only_y}\n- Neither: {total_neither}\n"
         
         # Build prompt without nested f-string complexity to avoid "Invalid format specifier"
+        lang_instructions = {
+            "en": "Respond in English.",
+            "kh": "Respond in Khasi language. Use simple and professional Khasi for a government report. Terms like 'District' or 'Infrastructure' can be kept in English if no direct Khasi term exists.",
+            "ga": "Respond in Garo language. Use professional Garo for a government report."
+        }
+        lang_prompt = lang_instructions.get(language, lang_instructions["en"])
+
         prompt = "System: You are the Meghalaya GeoAI Assistant. Summarize the spatial data findings below.\n"
-        prompt += "Persona: Analytical, professional Government Consultant.\n"
+        prompt += f"Persona: Analytical, professional Government Consultant. {lang_prompt}\n"
         prompt += f"Context: Analyzed {total_analyzed} schools for gaps in {', '.join(target_cols)}.\n\n"
         prompt += sc
         prompt += f"\n- Met all criteria: {total_both}\n\n"
@@ -608,12 +615,28 @@ async def get_summary_from_llm(question: str, data: list):
             "recommendations": ["Manual infrastructure audit recommended."]
         }
 
-async def get_heatmap_summary(metric: str, level: str, data: list, intent: str = "all"):
+async def get_heatmap_summary(metric: str, level: str, data: list, intent: str = "all", language: str = "en"):
     """
     Generates a summary for heatmap visualizations using aggregated trends.
     """
-    if not data:
-        return "No intensity data available for the selected metric."
+    if not data: return "No spatial density data available."
+    
+    lang_instructions = {
+        "en": "Respond in English.",
+        "kh": "Respond in Khasi language.",
+        "ga": "Respond in Garo language."
+    }
+    lang_prompt = lang_instructions.get(language, lang_instructions["en"])
+
+    prompt = f"""
+    Analyze the spatial distribution of {metric} across Meghalaya at {level} level.
+    The user is looking for intent: {intent}.
+    
+    DATA: {json.dumps(data)}
+    
+    Provide 2 bullet points about the geographical clusters of high and low values.
+    {lang_prompt}
+    """
 
     total = len(data)
     # The spatial_service now sends flat_data populated with 'intensity' and 'region_name'
