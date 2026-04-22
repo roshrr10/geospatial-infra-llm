@@ -81,41 +81,20 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
-    # Global school counts ("how many schools do we have")
-    if 'how many school' in q_lower or 'total school' in q_lower:
-        if 'district' not in q_lower and 'block' not in q_lower:
-            sql = "SELECT 'Meghalaya' as state_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_district_intelligence_final;"
-            result = (sql, "state")
-            llm_cache.set(question, result)
-            return result
-
-    # Districts with highest road density / Compare road density
-    if 'road density' in q_lower and 'district' in q_lower:
-        sql = "SELECT district_name, avg_road_density, geometry FROM meghalaya_district_intelligence_final ORDER BY avg_road_density DESC;"
-        result = (sql, "district")
-        llm_cache.set(question, result)
-        return result
-
-    # Districts with highest school density
-    if 'school density' in q_lower and 'district' in q_lower:
-        sql = "SELECT district_name, avg_school_density, geometry FROM meghalaya_district_intelligence_final ORDER BY avg_school_density DESC;"
-        result = (sql, "district")
-        llm_cache.set(question, result)
-        return result
-
-    # Blocks with highest school density
-    if ('school density' in q_lower or 'per sqkm' in q_lower or 'sq.km' in q_lower) and 'block' in q_lower:
-        sql = "SELECT block_name, district_name, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final ORDER BY schools_per_sqkm DESC; -- cache-v2"
-        result = (sql, "block")
-        llm_cache.set(question, result)
-        return result
-    
     # DISTRICT-LEVEL FILTERS (e.g., "schools in RI BHOI", "blocks in RI BHOI")
-    if any(d.lower() in q_lower for d in ["east khasi hills", "west khasi hills", "south west khasi hills", "ri bhoi", "east jaintia hills", "west jaintia hills", "east garo hills", "west garo hills", "south garo hills", "south west garo hills", "north garo hills"]):
-        dists = ["EAST KHASI HILLS", "WEST KHASI HILLS", "SOUTH WEST KHASI HILLS", "RI BHOI", "EAST JAINTIA HILLS", "WEST JAINTIA HILLS", "EAST GARO HILLS", "WEST GARO HILLS", "SOUTH GARO HILLS", "SOUTH WEST GARO HILLS", "NORTH GARO HILLS"]
+    # MUST be checked BEFORE global "total school" fallback to catch "total schools in east khasi hills"
+    if any(d.lower() in q_lower for d in ["east khasi hills", "west khasi hills", "south west khasi hills", "eastern west khasi hills", "ri bhoi", "east jaintia hills", "west jaintia hills", "east garo hills", "west garo hills", "south garo hills", "south west garo hills", "north garo hills"]):
+        dists = ["EAST KHASI HILLS", "WEST KHASI HILLS", "SOUTH WEST KHASI HILLS", "EASTERN WEST KHASI HILLS", "RI BHOI", "EAST JAINTIA HILLS", "WEST JAINTIA HILLS", "EAST GARO HILLS", "WEST GARO HILLS", "SOUTH GARO HILLS", "SOUTH WEST GARO HILLS", "NORTH GARO HILLS"]
         target_dist = next((d for d in dists if d.lower() in q_lower), "")
         
         if target_dist:
+            # Total/count queries for a specific district
+            if any(kw in q_lower for kw in ['total school', 'how many school', 'number of school', 'school count']):
+                sql = f"SELECT district_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_block_intelligence_final WHERE district_name = '{target_dist}' GROUP BY district_name;"
+                result = (sql, "district")
+                llm_cache.set(question, result)
+                return result
+
             if 'block' in q_lower:
                 sql = f"SELECT block_name, district_name, total_schools, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final WHERE district_name = '{target_dist}' ORDER BY total_schools DESC;"
                 result = (sql, "block")
@@ -153,6 +132,37 @@ async def get_sql_from_llm(question: str):
             
             llm_cache.set(question, result)
             return result
+
+    # Global school counts ("how many schools do we have")
+    # This MUST be after the district-specific handler above
+    if 'how many school' in q_lower or 'total school' in q_lower:
+        if 'district' not in q_lower and 'block' not in q_lower:
+            sql = "SELECT 'Meghalaya' as state_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_block_intelligence_final;"
+            result = (sql, "state")
+            llm_cache.set(question, result)
+            return result
+
+    # Districts with highest road density / Compare road density
+    if 'road density' in q_lower and 'district' in q_lower:
+        sql = "SELECT district_name, avg_road_density, geometry FROM meghalaya_district_intelligence_final ORDER BY avg_road_density DESC;"
+        result = (sql, "district")
+        llm_cache.set(question, result)
+        return result
+
+    # Districts with highest school density
+    if 'school density' in q_lower and 'district' in q_lower:
+        sql = "SELECT district_name, avg_school_density, geometry FROM meghalaya_district_intelligence_final ORDER BY avg_school_density DESC;"
+        result = (sql, "district")
+        llm_cache.set(question, result)
+        return result
+
+    # Blocks with highest school density
+    if ('school density' in q_lower or 'per sqkm' in q_lower or 'sq.km' in q_lower) and 'block' in q_lower:
+        sql = "SELECT block_name, district_name, schools_per_sqkm, geometry FROM meghalaya_block_intelligence_final ORDER BY schools_per_sqkm DESC; -- cache-v2"
+        result = (sql, "block")
+        llm_cache.set(question, result)
+        return result
+
 
     # --- JOINT INFRASTRUCTURE FALLBACKS (Priority) ---
     

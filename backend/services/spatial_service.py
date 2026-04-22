@@ -226,8 +226,9 @@ def execute_spatial_query(sql: str, user_query: str = ""):
     # 1.6.7 INTEL TABLE REDIRECTION: total_schools is only in block table
     if 'total_schools' in sql.lower() and 'meghalaya_district_intelligence_final' in sql.lower():
         sql = sql.replace('meghalaya_district_intelligence_final', 'meghalaya_block_intelligence_final')
+        # Only wrap bare total_schools (not already inside SUM()) using negative lookbehind
         if 'SUM(total_schools)' not in sql.upper() and 'SUM( total_schools )' not in sql.upper():
-            sql = sql.replace('total_schools', 'SUM(total_schools)')
+            sql = re.sub(r'(?<!\bSUM\()total_schools', 'SUM(total_schools)', sql, flags=re.IGNORECASE)
         if 'GROUP BY district_name' not in sql.upper():
             sql = sql.replace(';', ' GROUP BY district_name;')
         logger.warning("AUTO-FIX | Redirected total_schools query from district to block table")
