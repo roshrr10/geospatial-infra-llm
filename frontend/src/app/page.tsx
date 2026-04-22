@@ -72,7 +72,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import LanguageToggle from "@/components/LanguageToggle";
 
 export default function Dashboard() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [query, setQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [apiResult, setApiResult] = useState<any>(null);
