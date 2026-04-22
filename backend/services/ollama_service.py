@@ -27,21 +27,22 @@ If the user asks for ANY infrastructure data or counts (e.g., "schools with...",
   - `meghalaya_district_intelligence_final` (Columns: `district_name`, `geometry`, `avg_school_density`, `avg_road_density`)
   - `meghalaya_block_intelligence_final` (Columns: `block_name`, `district_name`, `geometry`, `total_schools`, `schools_per_sqkm`)
 - INFRASTRUCTURE COLUMNS (use these exact names in `meghalaya_infrastructure i`):
-  - `electricity_connection_available`, `drinking_water_availability`, `playground_available`, `ramp_available`, `solar_panel`, `library_facility`, `girls_toilet_available`
-  - `fire_extinguisher_available_1_yes_2_no`, `smart_classroom_available_in_school_1_yes_2_no`, `internet_facility_available_in_school_1_yes_2_no`, `no_of_computer`
-  - `whether_your_school_having_sanitary_pad_vending_machine__for_sc` as `vending_machine`, `whether_your_school_having_functional_incinerator_in_girls_toil` as `incinerator`
-- VALUES:
-  - 1 = Yes/Functional/Available, 0 = No/None/Needs/Unavailable, 2 = Functional Issue/Partial.
-  - For `no_of_computer`, use `i.no_of_computer > 0` for "has computers".
-- SPECIAL RULE (Counts/Density/Admin):
-  - CRITICAL: For "number of schools" OR "total schools" at a district level, use `COUNT(*)` from `meghalaya_schools` and `GROUP BY district_name`.
-  - For block-level counts, you can use `total_schools` from `meghalaya_block_intelligence_final`.
-  - If asked for "blocks in [District]", use `SELECT block_name, district_name, total_schools, geometry FROM meghalaya_block_intelligence_final WHERE district_name ILIKE '%[District]%';`
-  - If asked for "road density" or "school density", use `avg_road_density` or `avg_school_density` from `meghalaya_district_intelligence_final`.
-- BOTH/COMBINED RULE: If the query contains "both", "all of", or "and" for metrics (e.g., "schools with both X and Y"), you MUST select ALL schools (remove WHERE clauses for X/Y) but select individual infrastructure columns so the dashboard can calculate subsets (Both, Only X, Only Y, Neither).
-- MANDATORY COLUMNS: Always include `geometry`, identifiers (`udise_num`), AND context columns (`district_name`, `block_name`).
-- SCAN RULE: For comparative or general distribution queries (e.g. "lacking electricity", "both computers and smart classrooms"), generate SQL that selects ALL schools (with status columns) but do NOT include `WHERE X = 1` or `WHERE Y = 0`. The dashboard needs ALL data points to calculate full gaps.
-- EXAMPLE: User "Schools with both computers and smart classrooms" -> Response "SELECT s."schoolName", s.district_name, s.block_name, i.no_of_computer, i.smart_classroom_available_in_school_1_yes_2_no, s.geometry FROM meghalaya_schools s JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"
+- VALUES & CONDITIONALS:
+  - 1 = Yes/Functional/Available (Green).
+  - 0 = No/None/Missing (Red).
+  - 2 = Functional Issue / Needs Repair / Not Working (Orange/Issue).
+  - For "not working" or "functional issues", the user wants to see schools where the value is 0 OR 2.
+  - For "functional" or "working", the user wants to see schools where the value is 1.
+- GEOGRAPHIC SCOPE:
+  - You ONLY have data for Meghalaya, India. 
+  - If asked about other cities/states (e.g., "Bangalore", "Delhi"), respond with: "[CHAT] I am specialized in Meghalaya's infrastructure. I do not have data for [Location]. [/CHAT]"
+- INFRASTRUCTURE & HEALTH COLUMNS (meghalaya_infrastructure i):
+  - Health: `medical_facilities_medical_rooms_available`, `hand_washing_facility_after_meals`, `hand_washing_facility_near_toilet`, `drinking_water_functional`
+  - Safety: `fire_extinguisher_available_1_yes_2_no`, `dilapidated_building`, `boundary_wall_type_1_pucca_2_pucca_but_broken_3_barbed_wire_fen`
+  - Facilities: `electricity_connection_available`, `drinking_water_availability`, `playground_available`, `ramp_available`, `solar_panel`, `library_facility`, `girls_toilet_available`, `girls_activity_room_available`, `sport_equiptment`, `store_room_available`
+  - Digital: `smart_classroom_available_in_school_1_yes_2_no`, `internet_facility_available_in_school_1_yes_2_no`, `no_of_computer`
+- CONTEXT COLUMNS: `i.cluster_name`, `i.village_name`, `i.schlocation` (Rural/Urban), `i.schtype` (Co-ed/Boys/Girls)
+- BOTH/COMBINED RULE: For 2+ metrics, select ALL schools and individual columns for dashboard comparison.
 """
 _model_warmed = False
 
@@ -117,7 +118,21 @@ async def get_sql_from_llm(question: str):
                     'handwash': 'hand_washing_facility_near_toilet',
                     'hand wash': 'hand_washing_facility_near_toilet',
                     'vending machine': 'whether_your_school_having_sanitary_pad_vending_machine__for_sc',
-                    'incinerator': 'whether_your_school_having_functional_incinerator_in_girls_toil'
+                    'incinerator': 'whether_your_school_having_functional_incinerator_in_girls_toil',
+                    'activity room': 'girls_activity_room_available',
+                    'sports': 'sport_equiptment',
+                    'equipment': 'sport_equiptment',
+                    'medical': 'medical_facilities_medical_rooms_available',
+                    'health': 'medical_facilities_medical_rooms_available',
+                    'boundary': 'boundary_wall_type_1_pucca_2_pucca_but_broken_3_barbed_wire_fen',
+                    'wall': 'boundary_wall_type_1_pucca_2_pucca_but_broken_3_barbed_wire_fen',
+                    'dilapidated': 'dilapidated_building',
+                    'unsafe': 'dilapidated_building',
+                    'broken': 'dilapidated_building',
+                    'functional': 'drinking_water_functional',
+                    'working': 'drinking_water_functional',
+                    'not working': 'drinking_water_functional',
+                    'issue': 'drinking_water_functional'
                 }
                 
                 detected_cols = []
@@ -160,7 +175,7 @@ async def get_sql_from_llm(question: str):
                             END as multi_metric_attainment"""
 
                 sql = f"""-- NO_STRIP
-                        SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, {cols_sql}{extra_cols}{attainment_sql}, s.geometry 
+                        SELECT s."schoolName", s.district_name, s.block_name, i.cluster_name, i.village_name, i.schlocation, i.schtype, s.udise_num, {cols_sql}{extra_cols}{attainment_sql}, s.geometry 
                         FROM meghalaya_schools s 
                         JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text 
                         WHERE s.district_name = '{target_dist}' ORDER BY s."schoolName" ASC;"""
@@ -311,7 +326,21 @@ async def get_sql_from_llm(question: str):
         'hand wash': 'hand_washing_facility_near_toilet',
         'toilet': 'girls_toilet_available',
         'vending machine': 'whether_your_school_having_sanitary_pad_vending_machine__for_sc',
-        'incinerator': 'whether_your_school_having_functional_incinerator_in_girls_toil' # Defaulting to girls toilet if 'toilet' is mentioned generally
+        'incinerator': 'whether_your_school_having_functional_incinerator_in_girls_toil',
+        'activity room': 'girls_activity_room_available',
+        'sports': 'sport_equiptment',
+        'equipment': 'sport_equiptment',
+        'medical': 'medical_facilities_medical_rooms_available',
+        'health': 'medical_facilities_medical_rooms_available',
+        'boundary': 'boundary_wall_type_1_pucca_2_pucca_but_broken_3_barbed_wire_fen',
+        'wall': 'boundary_wall_type_1_pucca_2_pucca_but_broken_3_barbed_wire_fen',
+        'dilapidated': 'dilapidated_building',
+        'unsafe': 'dilapidated_building',
+        'broken': 'dilapidated_building',
+        'functional': 'drinking_water_functional',
+        'working': 'drinking_water_functional',
+        'not working': 'drinking_water_functional',
+        'issue': 'drinking_water_functional'
     }
     
     detected_infra_cols = []
@@ -353,7 +382,7 @@ async def get_sql_from_llm(question: str):
                     END as multi_metric_attainment"""
 
         sql = f"""-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, {cols_sql}{extra_cols}{attainment_sql}, s.geometry 
+                 SELECT s."schoolName", s.district_name, s.block_name, i.cluster_name, i.village_name, i.schlocation, i.schtype, s.udise_num, {cols_sql}{extra_cols}{attainment_sql}, s.geometry 
                  FROM meghalaya_schools s 
                  JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
         result = (sql, "school")
