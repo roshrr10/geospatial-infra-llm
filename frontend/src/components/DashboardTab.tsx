@@ -120,7 +120,7 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
         !k.toLowerCase().includes('status') &&
         data.slice(0, 10).every(d => isPos(d[k]) || isNeg(d[k]) || isIss(d[k]) || d[k] == null)
     );
-    const isMultiBinaryMode = binaryCols.length === 2;
+    const isMultiBinaryMode = binaryCols.length >= 2;
     const multiStats: any[] = [];
     
     // Helper for cleaning metric names
@@ -138,64 +138,72 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
     };
 
     if (isMultiBinaryMode) {
-        const s1 = binaryCols[0];
-        const s2 = binaryCols[1];
-        
-        // Find a status column if it exists (e.g. comp_smart_attainment)
+        // Find a status column if it exists (e.g. multi_metric_attainment)
         const statusKey = Object.keys(sample).find(k => k.toLowerCase().includes('_attainment') || k.toLowerCase().includes('_status'));
 
-        let both = 0, onlyX = 0, onlyY = 0, neither = 0;
-        data.forEach(d => {
-            // Check if backend already provided a calculated status
-            const sVal = safeStr(d[statusKey || 'status']);
-            if (sVal === 'both') both++;
-            else if (sVal.includes('only') && sVal.includes(s1.split('_')[0])) onlyX++;
-            else if (sVal.includes('only') && sVal.includes(s2.split('_')[0])) onlyY++;
-            else if (sVal === 'neither' || sVal === 'none') neither++;
-            else {
-                // Fallback to manual calc
-                const p1 = isPos(d[s1]);
-                const p2 = isPos(d[s2]);
-                if (p1 && p2) both++;
-                else if (p1 && !p2) onlyX++;
-                else if (!p1 && p2) onlyY++;
-                else neither++;
-            }
-        });
+        if (binaryCols.length === 2) {
+            const s1 = binaryCols[0];
+            const s2 = binaryCols[1];
+            
+            let both = 0, onlyX = 0, onlyY = 0, neither = 0;
+            data.forEach(d => {
+                // Check if backend already provided a calculated status
+                const sVal = safeStr(d[statusKey || 'status']);
+                if (sVal === 'both') both++;
+                else if (sVal.toLowerCase().includes('only') && sVal.toLowerCase().includes(s1.split('_')[0].toLowerCase())) onlyX++;
+                else if (sVal.toLowerCase().includes('only') && sVal.toLowerCase().includes(s2.split('_')[0].toLowerCase())) onlyY++;
+                else if (sVal === 'neither' || sVal === 'none' || sVal === 'none met') neither++;
+                else {
+                    // Fallback to manual calc
+                    const p1 = isPos(d[s1]);
+                    const p2 = isPos(d[s2]);
+                    if (p1 && p2) both++;
+                    else if (p1 && !p2) onlyX++;
+                    else if (!p1 && p2) onlyY++;
+                    else neither++;
+                }
+            });
 
-        // OVERRIDE core metric counts for multi-mode so summary cards align
-        // (This makes the top cards show "Both" and "Neither")
-        // We do this BEFORE the return so gapAnalysis uses these values
-        // positiveCount = BOTH, negativeCount = NEITHER, issueCount = PARTIAL(OnlyX+OnlyY)
-        const vennPositive = both;
-        const vennNegative = neither;
-        const vennIssue = onlyX + onlyY;
+            multiStats.push(
+                { name: 'Both', value: both, color: '#10b981', label: 'Joint Compliance' },
+                { name: getCleanLabel(s1), value: onlyX, color: '#3b82f6', label: `${getCleanLabel(s1)} only` },
+                { name: getCleanLabel(s2), value: onlyY, color: '#f59e0b', label: `${getCleanLabel(s2)} only` },
+                { name: 'None', value: neither, color: '#ef4444', label: 'No Facility' }
+            );
+        } else {
+            // 3+ Metrics Mode: Use Backend Categorization
+            let allMet = 0, partialMet = 0, noneMet = 0;
+            data.forEach(d => {
+                const sVal = safeStr(d[statusKey || 'status']);
+                if (sVal === 'all met') allMet++;
+                else if (sVal === 'partial met') partialMet++;
+                else noneMet++;
+            });
 
-        multiStats.push(
-            { name: 'Both', value: both, color: '#10b981', label: 'Joint Compliance' },
-            { name: getCleanLabel(s1), value: onlyX, color: '#3b82f6', label: `${getCleanLabel(s1)} only` },
-            { name: getCleanLabel(s2), value: onlyY, color: '#f59e0b', label: `${getCleanLabel(s2)} only` },
-            { name: 'None', value: neither, color: '#ef4444', label: 'No Facility' }
-        );
+            multiStats.push(
+                { name: 'All Met', value: allMet, color: '#10b981', label: 'Full Compliance' },
+                { name: 'Partial', value: partialMet, color: '#3b82f6', label: 'Partial Infrastructure' },
+                { name: 'None Met', value: noneMet, color: '#ef4444', label: 'Critical Gap' }
+            );
+        }
 
-        // Final Gap Analysis and Summary alignment
-        const finalPos = isMultiBinaryMode ? both : positiveCount;
-        const finalNeg = isMultiBinaryMode ? neither : negativeCount;
-        const finalIss = isMultiBinaryMode ? (onlyX + onlyY) : issueCount;
-        const finalCov = total > 0 ? Math.round((finalPos / total) * 100) : 0;
+        const vennPositive = multiStats[0].value;
+        const vennNegative = multiStats[multiStats.length - 1].value;
+        const vennIssue = multiStats.slice(1, -1).reduce((acc, curr) => acc + curr.value, 0);
+        const finalCov = total > 0 ? Math.round((vennPositive / total) * 100) : 0;
 
         return {
-            summaryCards: { total, positiveCount: finalPos, negativeCount: finalNeg, issueCount: finalIss, coverageVal: finalCov },
-            barData: isMultiBinaryMode ? multiStats : statusData,
-            pieData: isMultiBinaryMode ? multiStats : statusData,
+            summaryCards: { total, positiveCount: vennPositive, negativeCount: vennNegative, issueCount: vennIssue, coverageVal: finalCov },
+            barData: multiStats,
+            pieData: multiStats,
             isMultiBinaryMode,
             multiStats,
             districtBreakdown,
             blockBreakdown,
             gapAnalysis: {
                 totalTarget: total,
-                currentEquipped: finalPos,
-                gapCount: finalNeg + finalIss,
+                currentEquipped: vennPositive,
+                gapCount: vennNegative + vennIssue,
                 coverage: finalCov,
                 worstBlock: gapAnalysis.worstBlock,
                 worstDistrict: gapAnalysis.worstDistrict

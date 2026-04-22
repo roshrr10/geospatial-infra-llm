@@ -132,33 +132,35 @@ async def get_sql_from_llm(question: str):
                 
                 cols_sql = ", ".join([f"i.{c}" for c in detected_cols])
                 
-                # Scoring logic for multiple metrics
-                score_parts = " + ".join([f"COALESCE(CASE WHEN i.{c} = 1 THEN 1 ELSE 0 END, 0)" for c in detected_cols])
-                total_count = len(detected_cols)
-                score_sql = f", (({score_parts})::float / {total_count} * 100) as infrastructure_score"
-                met_count_sql = f", ({score_parts}) as met_criteria_count"
-
-                # Multi-metric attainment logic
+                extra_cols = ""
                 attainment_sql = ""
-                if len(detected_cols) == 2:
-                    c1, c2 = detected_cols
-                    attainment_sql = f""",
-                        CASE 
-                            WHEN (i.{c1} = 1 AND i.{c2} = 1) THEN 'Both'
-                            WHEN (i.{c1} = 1) THEN 'Only {c1.split('_')[0].capitalize()}'
-                            WHEN (i.{c2} = 1) THEN 'Only {c2.split('_')[0].capitalize()}'
-                            ELSE 'Neither'
-                        END as multi_metric_attainment"""
-                elif len(detected_cols) > 2:
-                    attainment_sql = f""", 
-                        CASE 
-                            WHEN ({score_parts}) = {total_count} THEN 'All Met'
-                            WHEN ({score_parts}) > 0 THEN 'Partial Met'
-                            ELSE 'None Met'
-                        END as multi_metric_attainment"""
+
+                if len(detected_cols) > 1:
+                    # Scoring logic for multiple metrics
+                    score_parts = " + ".join([f"COALESCE(CASE WHEN i.{c} = 1 THEN 1 ELSE 0 END, 0)" for c in detected_cols])
+                    total_count = len(detected_cols)
+                    extra_cols = f", (({score_parts})::float / {total_count} * 100) as infrastructure_score, ({score_parts}) as met_criteria_count"
+
+                    # Multi-metric attainment logic
+                    if len(detected_cols) == 2:
+                        c1, c2 = detected_cols
+                        attainment_sql = f""",
+                            CASE 
+                                WHEN (i.{c1} = 1 AND i.{c2} = 1) THEN 'Both'
+                                WHEN (i.{c1} = 1) THEN 'Only {c1.split('_')[0].capitalize()}'
+                                WHEN (i.{c2} = 1) THEN 'Only {c2.split('_')[0].capitalize()}'
+                                ELSE 'Neither'
+                            END as multi_metric_attainment"""
+                    else:
+                        attainment_sql = f""", 
+                            CASE 
+                                WHEN ({score_parts}) = {total_count} THEN 'All Met'
+                                WHEN ({score_parts}) > 0 THEN 'Partial Met'
+                                ELSE 'None Met'
+                            END as multi_metric_attainment"""
 
                 sql = f"""-- NO_STRIP
-                        SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, {cols_sql}{score_sql}{met_count_sql}{attainment_sql}, s.geometry 
+                        SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, {cols_sql}{extra_cols}{attainment_sql}, s.geometry 
                         FROM meghalaya_schools s 
                         JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text 
                         WHERE s.district_name = '{target_dist}' ORDER BY s."schoolName" ASC;"""
@@ -322,35 +324,36 @@ async def get_sql_from_llm(question: str):
     if detected_infra_cols:
         cols_sql = ", ".join([f"i.{c}" for c in detected_infra_cols])
         
-        # Scoring logic for multiple metrics
-        # We treat each column as a binary (0 or 1). Score is the sum / count * 100
-        score_parts = " + ".join([f"COALESCE(CASE WHEN i.{c} = 1 THEN 1 ELSE 0 END, 0)" for c in detected_infra_cols])
-        total_count = len(detected_infra_cols)
-        score_sql = f", (({score_parts})::float / {total_count} * 100) as infrastructure_score"
-        met_count_sql = f", ({score_parts}) as met_criteria_count"
-        
+        extra_cols = ""
         attainment_sql = ""
-        if len(detected_infra_cols) == 2:
-            c1, c2 = detected_infra_cols
-            l1 = c1.split('_')[0].capitalize()
-            l2 = c2.split('_')[0].capitalize()
-            attainment_sql = f""",
-                CASE 
-                    WHEN (i.{c1} = 1 AND i.{c2} = 1) THEN 'Both'
-                    WHEN (i.{c1} = 1) THEN 'Only {l1}'
-                    WHEN (i.{c2} = 1) THEN 'Only {l2}'
-                    ELSE 'Neither'
-                END as multi_metric_attainment"""
-        elif len(detected_infra_cols) > 2:
-            attainment_sql = f""", 
-                CASE 
-                    WHEN ({score_parts}) = {total_count} THEN 'All Met'
-                    WHEN ({score_parts}) > 0 THEN 'Partial Met'
-                    ELSE 'None Met'
-                END as multi_metric_attainment"""
+
+        if len(detected_infra_cols) > 1:
+            # Scoring logic for multiple metrics
+            score_parts = " + ".join([f"COALESCE(CASE WHEN i.{c} = 1 THEN 1 ELSE 0 END, 0)" for c in detected_infra_cols])
+            total_count = len(detected_infra_cols)
+            extra_cols = f", (({score_parts})::float / {total_count} * 100) as infrastructure_score, ({score_parts}) as met_criteria_count"
+
+            if len(detected_infra_cols) == 2:
+                c1, c2 = detected_infra_cols
+                l1 = c1.split('_')[0].capitalize()
+                l2 = c2.split('_')[0].capitalize()
+                attainment_sql = f""",
+                    CASE 
+                        WHEN (i.{c1} = 1 AND i.{c2} = 1) THEN 'Both'
+                        WHEN (i.{c1} = 1) THEN 'Only {l1}'
+                        WHEN (i.{c2} = 1) THEN 'Only {l2}'
+                        ELSE 'Neither'
+                    END as multi_metric_attainment"""
+            else:
+                attainment_sql = f""", 
+                    CASE 
+                        WHEN ({score_parts}) = {total_count} THEN 'All Met'
+                        WHEN ({score_parts}) > 0 THEN 'Partial Met'
+                        ELSE 'None Met'
+                    END as multi_metric_attainment"""
 
         sql = f"""-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, {cols_sql}{score_sql}{met_count_sql}{attainment_sql}, s.geometry 
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, {cols_sql}{extra_cols}{attainment_sql}, s.geometry 
                  FROM meghalaya_schools s 
                  JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
         result = (sql, "school")
