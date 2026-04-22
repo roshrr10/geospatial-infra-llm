@@ -33,8 +33,8 @@ If the user asks for ANY infrastructure data or counts (e.g., "schools with...",
   - 1 = Yes/Functional/Available, 0 = No/None/Needs/Unavailable, 2 = Functional Issue/Partial.
   - For `no_of_computer`, use `i.no_of_computer > 0` for "has computers".
 - SPECIAL RULE (Counts/Density/Admin):
-  - CRITICAL: "number of schools" OR "total schools" are ONLY available in the BLOCK table (`meghalaya_block_intelligence_final`).
-  - If asked for "number of schools" by district, you MUST use `SUM(total_schools)` from `meghalaya_block_intelligence_final` and GROUP BY `district_name`. NEVER use `total_schools` on the district table.
+  - CRITICAL: For "number of schools" OR "total schools" at a district level, use `COUNT(*)` from `meghalaya_schools` and `GROUP BY district_name`.
+  - For block-level counts, you can use `total_schools` from `meghalaya_block_intelligence_final`.
   - If asked for "blocks in [District]", use `SELECT block_name, district_name, total_schools, geometry FROM meghalaya_block_intelligence_final WHERE district_name ILIKE '%[District]%';`
   - If asked for "road density" or "school density", use `avg_road_density` or `avg_school_density` from `meghalaya_district_intelligence_final`.
 - BOTH/COMBINED RULE: If the query contains "both", "all of", or "and" for metrics (e.g., "schools with both X and Y"), you MUST select ALL schools (remove WHERE clauses for X/Y) but select individual infrastructure columns so the dashboard can calculate subsets (Both, Only X, Only Y, Neither).
@@ -117,14 +117,32 @@ async def get_sql_from_llm(question: str):
                     'hand wash': 'hand_washing_facility_near_toilet'
                 }
                 
-                infra_col = 'electricity_connection_available'
+                detected_cols = []
+                seen_cols = set()
                 for kw, col in metrics_map.items():
-                    if kw in q_lower:
-                        infra_col = col
-                        break
+                    if kw in q_lower and col not in seen_cols:
+                        detected_cols.append(col)
+                        seen_cols.add(col)
+                
+                if not detected_cols:
+                    detected_cols = ['electricity_connection_available']
+                
+                cols_sql = ", ".join([f"i.{c}" for c in detected_cols])
+                
+                # Multi-metric attainment logic if exactly 2 metrics detected
+                attainment_sql = ""
+                if len(detected_cols) == 2:
+                    c1, c2 = detected_cols
+                    attainment_sql = f""",
+                        CASE 
+                            WHEN (i.{c1} = 1 AND i.{c2} = 1) THEN 'Both'
+                            WHEN (i.{c1} = 1) THEN 'Only {c1.split('_')[0].capitalize()}'
+                            WHEN (i.{c2} = 1) THEN 'Only {c2.split('_')[0].capitalize()}'
+                            ELSE 'Neither'
+                        END as multi_metric_attainment"""
 
                 sql = f"""-- NO_STRIP
-                        SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, i.{infra_col}, s.geometry 
+                        SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, {cols_sql}{attainment_sql}, s.geometry 
                         FROM meghalaya_schools s 
                         JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text 
                         WHERE s.district_name = '{target_dist}' ORDER BY s."schoolName" ASC;"""
@@ -221,41 +239,6 @@ async def get_sql_from_llm(question: str):
         llm_cache.set(question, result)
         return result
 
-    # --- SINGLE METRIC FALLBACKS ---
-
-    # Computers
-    if 'computer' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.no_of_computer, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # Smart Classrooms
-    if 'smart' in q_lower or 'classroom' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.smart_classroom_available_in_school_1_yes_2_no as smart_classroom, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # SOLAR PANEL
-    if 'solar' in q_lower or 'panel' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.solar_panel, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
     # --- DENSITY & AGGREGATE FALLBACKS ---
     if 'road density' in q_lower and 'district' in q_lower:
         sql = """-- NO_STRIP
@@ -286,115 +269,64 @@ async def get_sql_from_llm(question: str):
 
     if 'total schools' in q_lower and 'district' in q_lower:
         sql = """-- NO_STRIP
-                 SELECT district_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry
-                 FROM meghalaya_block_intelligence_final 
-                 GROUP BY district_name
-                 ORDER BY total_schools DESC;"""
+                 SELECT district_name, COUNT(*) as total_schools FROM meghalaya_schools GROUP BY district_name ORDER BY total_schools DESC;"""
         result = (sql, "district")
         llm_cache.set(question, result)
         return result
 
-    # LIBRARY
-    if 'library' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.library_facility, s.geometry
-                 FROM meghalaya_schools s
+    # --- GENERIC MULTI-METRIC INFRASTRUCTURE DETECTION ---
+    # This block catches any combination of infra keywords not handled by the priority joint fallbacks above
+    infra_metrics_map = {
+        'electricity': 'electricity_connection_available',
+        'water': 'drinking_water_availability',
+        'drinking': 'drinking_water_availability',
+        'computer': 'no_of_computer',
+        'smart': 'smart_classroom_available_in_school_1_yes_2_no',
+        'classroom': 'smart_classroom_available_in_school_1_yes_2_no',
+        'library': 'library_facility',
+        'ramp': 'ramp_available',
+        'solar': 'solar_panel',
+        'playground': 'playground_available',
+        'internet': 'internet_facility_available_in_school_1_yes_2_no',
+        'fire': 'fire_extinguisher_available_1_yes_2_no',
+        'handwash': 'hand_washing_facility_near_toilet',
+        'hand wash': 'hand_washing_facility_near_toilet',
+        'toilet': 'girls_toilet_available' # Defaulting to girls toilet if 'toilet' is mentioned generally
+    }
+    
+    detected_infra_cols = []
+    seen_infra_cols = set()
+    for kw, col in infra_metrics_map.items():
+        if kw in q_lower and col not in seen_infra_cols:
+            detected_infra_cols.append(col)
+            seen_infra_cols.add(col)
+            
+    if detected_infra_cols:
+        cols_sql = ", ".join([f"i.{c}" for c in detected_infra_cols])
+        
+        attainment_sql = ""
+        if len(detected_infra_cols) == 2:
+            c1, c2 = detected_infra_cols
+            l1 = c1.split('_')[0].capitalize()
+            l2 = c2.split('_')[0].capitalize()
+            attainment_sql = f""",
+                CASE 
+                    WHEN (i.{c1} = 1 AND i.{c2} = 1) THEN 'Both'
+                    WHEN (i.{c1} = 1) THEN 'Only {l1}'
+                    WHEN (i.{c2} = 1) THEN 'Only {l2}'
+                    ELSE 'Neither'
+                END as multi_metric_attainment"""
+
+        sql = f"""-- NO_STRIP
+                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num, {cols_sql}{attainment_sql}, s.geometry 
+                 FROM meghalaya_schools s 
                  JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
-
-    # PLAYGROUND
-    if 'playground' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.playground_available, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # TOILET
-    if 'toilet' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.boy_toilet_available, i.girls_toilet_available, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # INTERNET (standalone, not combined with smart classroom)
-    if 'internet' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.internet_facility_available_in_school_1_yes_2_no as internet_available, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # FIRE EXTINGUISHER
-    if 'fire' in q_lower or 'extinguisher' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.fire_extinguisher_available_1_yes_2_no as fire_extinguisher, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # HAND WASHING
-    if 'handwash' in q_lower or 'hand wash' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.hand_washing_facility_near_toilet, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # RAMPS (Specific Sidebar Fix)
-    if 'ramp' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.ramp_available, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # ELECTRICITY (Broad Baseline Fix)
-    if 'electricity' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.electricity_connection_available, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
-    # WATER (Broad Baseline Fix)
-    if 'water' in q_lower or 'drinking water' in q_lower:
-        sql = """-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, s.udise_num,
-                 i.drinking_water_availability, s.geometry
-                 FROM meghalaya_schools s
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
-        result = (sql, "school")
-        llm_cache.set(question, result)
-        return result
-
 
     await warm_up_model()
+
     prompt = f"System: {SYSTEM_PROMPT}\n\nUser Question: {question}\n\nResponse:"
     
     payload = {

@@ -116,6 +116,8 @@ export default function DashboardTab({ data, activeMetric, level, summary }: Das
     const binaryCols = Object.keys(sample).filter(k => 
         infra_keywords.some(kw => k.toLowerCase().includes(kw)) && 
         !['id', 'udise_code', 'udise_num', 'geometry'].includes(k) &&
+        !k.toLowerCase().includes('attainment') &&
+        !k.toLowerCase().includes('status') &&
         data.slice(0, 10).every(d => isPos(d[k]) || isNeg(d[k]) || isIss(d[k]) || d[k] == null)
     );
     const isMultiBinaryMode = binaryCols.length === 2;
