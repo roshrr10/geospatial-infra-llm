@@ -19,15 +19,17 @@
 ## 3. How It Works (The Flow)
 1. **User asks:** "Show schools without drinking water in West Garo Hills"
 2. **Frontend** sends this text to the **Backend API** via ngrok/localhost.
-3. **Backend** passes the text to the **LLM Service** (`backend/llm/`).
+3. **Backend** passes the text to the **Ollama Service** (`backend/services/ollama_service.py`).
 4. **LLM Brain** (Prompt Engineering):
-   - Decides WHICH table to use (Schools vs Blocks vs Districts).
-   - Converts English to SQL (e.g., `WHERE drinking_water = 'No' AND district_name = 'WEST GARO HILLS'`).
-5. **PostGIS Execution:**
-   - The GeoSQL runs against the Postgres database.
-   - It returns real data (lat/long points, polygons, statistics).
+   - Uses hardcoded high-performance fallbacks for common queries (Counts, Density).
+   - Generates dynamic SQL for complex infrastructure filters.
+   - Converts English to SQL (e.g., `WHERE electricity_connection_available = 1 AND district_name = 'WEST GARO HILLS'`).
+5. **Spatial Service Execution (`backend/services/spatial_service.py`):**
+   - Cleans and auto-fixes LLM-generated SQL (handling case sensitivity, missing geometry, etc.).
+   - Executes the GeoSQL against the Postgres database using SQLAlchemy and GeoPandas.
+   - Returns real data (GeoJSON features and formatted tables).
 6. **Response:**
-   - The Backend groups the data into GeoJSON (for the map features) and sends it alongside AI analytical summaries back to the Frontend UI.
+   - The Backend sends the GeoJSON and table data alongside AI-generated analytical summaries back to the Frontend.
 
 ---
 
@@ -41,12 +43,13 @@ We don't just dump raw files. We utilize a strong **ETL Pipeline** built into th
    - Normalizes text casing, stripping whitespaces.
    - Validates values (e.g. converting 'Yes'/'No' text fields into strict querying columns where applicable).
 3. **Data Schemas:**
-   - We utilize highly explicit schema definitions (`backend/school_schema.txt` structure) mapped to Database tables so the LLM knows exactly what column names it can utilize.
+   - We utilize a unified data model across `meghalaya_schools` and intelligence tables.
+   - The system uses a strict mapping between natural language metrics and database columns defined in the service layer.
 
 ---
 
 ## 5. The "Brain" Logic (LLM Rules)
-We programmed robust guardrails into the LLM system prompts (`backend/nlq/prompt_builder.py`) to handle complex queries safely.
+We programmed robust guardrails into the LLM system prompts (`backend/services/ollama_service.py`) to handle complex queries safely.
 
 ### Special Logic We Guard Against:
 1. **Averting NULL values:**
