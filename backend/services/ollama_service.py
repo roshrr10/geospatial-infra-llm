@@ -69,7 +69,7 @@ async def get_sql_from_llm(question: str):
     
     # District school counts
     if any(kw in q_lower for kw in ['district', 'districts']) and any(kw in q_lower for kw in ['most school', 'number of school', 'more school', 'total school', 'school count']):
-        sql = "SELECT district_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_block_intelligence_final GROUP BY district_name ORDER BY total_schools DESC;"
+        sql = "SELECT district_name, COUNT(*) as total_schools FROM meghalaya_schools GROUP BY district_name ORDER BY total_schools DESC;"
         result = (sql, "district")
         llm_cache.set(question, result)
         return result
@@ -90,7 +90,7 @@ async def get_sql_from_llm(question: str):
         if target_dist:
             # Total/count queries for a specific district
             if any(kw in q_lower for kw in ['total school', 'how many school', 'number of school', 'school count']):
-                sql = f"SELECT district_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_block_intelligence_final WHERE district_name = '{target_dist}' GROUP BY district_name;"
+                sql = f"SELECT district_name, COUNT(*) as total_schools FROM meghalaya_schools WHERE district_name = '{target_dist}' GROUP BY district_name;"
                 result = (sql, "district")
                 llm_cache.set(question, result)
                 return result
@@ -137,7 +137,7 @@ async def get_sql_from_llm(question: str):
     # This MUST be after the district-specific handler above
     if 'how many school' in q_lower or 'total school' in q_lower:
         if 'district' not in q_lower and 'block' not in q_lower:
-            sql = "SELECT 'Meghalaya' as state_name, SUM(total_schools) as total_schools, ST_Union(geometry) as geometry FROM meghalaya_block_intelligence_final;"
+            sql = "SELECT 'Meghalaya' as state_name, COUNT(*) as total_schools FROM meghalaya_schools;"
             result = (sql, "state")
             llm_cache.set(question, result)
             return result

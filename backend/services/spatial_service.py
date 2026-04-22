@@ -239,7 +239,9 @@ def execute_spatial_query(sql: str, user_query: str = ""):
     tables_with_geometry = ['meghalaya_schools', 'meghalaya_district_intelligence_final', 'meghalaya_block_intelligence_final']
     query_has_spatial_table = any(t in sql.lower() for t in tables_with_geometry)
     has_wildcard = bool(re.search(r'\b\w+\.\*', sql))
-    if query_has_spatial_table and not has_wildcard and "GEOMETRY" not in sql.upper() and "SELECT " in sql.upper():
+    is_aggregate = any(kw in sql.upper() for kw in ["COUNT(", "SUM(", "AVG(", "MIN(", "MAX("])
+    
+    if query_has_spatial_table and not has_wildcard and not is_aggregate and "GEOMETRY" not in sql.upper() and "SELECT " in sql.upper():
         if "FROM" in sql.upper():
             parts = sql.split(";", 1)
             main_sql = parts[0]
@@ -262,8 +264,10 @@ def execute_spatial_query(sql: str, user_query: str = ""):
                     sql = main_sql + ";"
 
 
-    # 1.8 Auto-fix: Strip invalid GROUP BY s.* or if it causes errors
-    if "GROUP BY" in sql.upper() and ("s.*" in sql.lower() or "s.*" in sql or "*" in sql):
+    # 1.8 Auto-fix: Strip invalid GROUP BY if s.* or bare * is used (which shouldn't be grouped)
+    # We specifically allow COUNT(*) by ensuring the wildcard isn't part of a count aggregate
+    has_incompatible_wildcard = "s.*" in sql.lower() or re.search(r'(?<!COUNT\()\b\*(?!\s*\))', sql, re.IGNORECASE)
+    if "GROUP BY" in sql.upper() and has_incompatible_wildcard:
         # If we have s.* and a GROUP BY, it's almost certainly a broken LLM query 
         # for a listing page. We strip the GROUP BY.
         sql = sql.split("GROUP BY")[0].strip() + ";"
