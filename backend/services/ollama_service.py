@@ -142,10 +142,15 @@ async def get_sql_from_llm(question: str):
                         detected_cols.append(col)
                         seen_cols.add(col)
                 
-                if not detected_cols:
-                    detected_cols = ['electricity_connection_available']
+                # If rural/urban mentioned, prioritize those as filters
+                location_filter = ""
+                if 'rural' in q_lower: location_filter = " AND i.schlocation = 'Rural'"
+                elif 'urban' in q_lower: location_filter = " AND i.schlocation = 'Urban'"
+
+                cols_sql = ""
+                if detected_cols:
+                    cols_sql = ", " + ", ".join([f"i.{c}" for c in detected_cols])
                 
-                cols_sql = ", ".join([f"i.{c}" for c in detected_cols])
                 
                 extra_cols = ""
                 attainment_sql = ""
@@ -175,10 +180,10 @@ async def get_sql_from_llm(question: str):
                             END as multi_metric_attainment"""
 
                 sql = f"""-- NO_STRIP
-                        SELECT s."schoolName", s.district_name, s.block_name, i.cluster_name, i.village_name, i.schlocation, i.schtype, s.udise_num, {cols_sql}{extra_cols}{attainment_sql}, s.geometry 
+                        SELECT s."schoolName", s.district_name, s.block_name, i.cluster_name, i.village_name, i.schlocation, i.schtype, s.udise_num{cols_sql}{extra_cols}{attainment_sql}, s.geometry 
                         FROM meghalaya_schools s 
                         JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text 
-                        WHERE s.district_name = '{target_dist}' ORDER BY s."schoolName" ASC;"""
+                        WHERE s.district_name = '{target_dist}'{location_filter} ORDER BY s."schoolName" ASC;"""
                 result = (sql, "school")
             
             llm_cache.set(question, result)
@@ -350,8 +355,15 @@ async def get_sql_from_llm(question: str):
             detected_infra_cols.append(col)
             seen_infra_cols.add(col)
             
-    if detected_infra_cols:
-        cols_sql = ", ".join([f"i.{c}" for c in detected_infra_cols])
+    # Location filters
+    loc_filter = ""
+    if 'rural' in q_lower: loc_filter = " WHERE i.schlocation = 'Rural'"
+    elif 'urban' in q_lower: loc_filter = " WHERE i.schlocation = 'Urban'"
+
+    if detected_infra_cols or loc_filter:
+        cols_sql = ""
+        if detected_infra_cols:
+            cols_sql = ", " + ", ".join([f"i.{c}" for c in detected_infra_cols])
         
         extra_cols = ""
         attainment_sql = ""
@@ -382,9 +394,9 @@ async def get_sql_from_llm(question: str):
                     END as multi_metric_attainment"""
 
         sql = f"""-- NO_STRIP
-                 SELECT s."schoolName", s.district_name, s.block_name, i.cluster_name, i.village_name, i.schlocation, i.schtype, s.udise_num, {cols_sql}{extra_cols}{attainment_sql}, s.geometry 
+                 SELECT s."schoolName", s.district_name, s.block_name, i.cluster_name, i.village_name, i.schlocation, i.schtype, s.udise_num{cols_sql}{extra_cols}{attainment_sql}, s.geometry 
                  FROM meghalaya_schools s 
-                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text;"""
+                 JOIN meghalaya_infrastructure i ON i.udise_code::text = s.udise_num::text{loc_filter};"""
         result = (sql, "school")
         llm_cache.set(question, result)
         return result
