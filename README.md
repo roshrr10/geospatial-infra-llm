@@ -1,4 +1,4 @@
-# Geospatial Infrastructure GeoAI Platform
+# Meghalaya GeoAI Infrastructure Platform
 
 This project is a comprehensive geospatial intelligence system that integrates a PostGIS spatial database, administrative infrastructure datasets, and Large Language Models (LLMs) to enable natural-language querying of geospatial infrastructure data.
 
